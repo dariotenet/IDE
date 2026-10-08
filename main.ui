@@ -37,6 +37,7 @@
     <addaction name="actionNew"/>
     <addaction name="separator"/>
     <addaction name="actionOpen"/>
+    <addaction name="actionOpen_Folder"/>
     <addaction name="separator"/>
     <addaction name="actionSave"/>
     <addaction name="actionSave_As"/>
@@ -302,6 +303,11 @@
   <action name="actionEjecutar">
    <property name="text">
     <string>Ejecutar</string>
+   </property>
+  </action>
+  <action name="actionOpen_Folder">
+   <property name="text">
+    <string>Open Folder</string>
    </property>
   </action>
  </widget>

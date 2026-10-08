@@ -1,0 +1,55 @@
+programa → main { lista_declaraciones lista_sentencias }
+
+lista_declaraciones → declaracion_variable lista_declaraciones | ε
+declaracion_variable → tipo identificadores ;
+
+identificadores → id identificadores_cola
+identificadores_cola → , identificadores | ε
+
+tipo → int | float | bool
+
+lista_sentencias → sentencia lista_sentencias | ε
+sentencia → seleccion | iteracion | repeticion | sent_in | sent_out | asignacion
+
+asignacion → id = expresion ; | id ++ ; | id -- ; | ++ id ; | -- id ;
+seleccion → if ( expresion ) { lista_sentencias } [ else { lista_sentencias } ]
+iteracion → while ( expresion ) { lista_sentencias }
+repeticion → do { lista_sentencias } while ( expresion ) ;
+
+sent_in → cin >> id ;
+
+sent_out → cout << salida ;
+salida → item_salida salida_cola
+salida_cola → << salida | ε
+
+item_salida → cadena | expresion
+
+expresion → expr_or
+
+expr_or → expr_and expr_or_prima
+expr_or_prima → || expr_and expr_or_prima | ε
+
+expr_and → expr_relacional expr_and_prima
+expr_and_prima → && expr_relacional expr_and_prima | ε
+
+expr_relacional → expr_simple expr_rel_cola
+expr_rel_cola → rel_op expr_simple | ε
+rel_op → < | <= | > | >= | == | !=
+
+expr_simple → termino expr_simple_prima
+expr_simple_prima → (+ | -) termino expr_simple_prima | ε
+
+termino → factor_unario termino_prima
+termino_prima → (* | / | %) factor_unario termino_prima | ε
+
+factor_unario → - factor_unario | factor
+
+factor → componente factor_cola
+factor_cola → ^ factor | ε
+
+componente → ( expresion ) | número | true | false | 
+             ++ id | -- id | ! componente | id id_cola
+             
+id_cola → ++ | -- | ε
+
+cadena → "cualquier texto"
