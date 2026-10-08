@@ -1,1 +1,6 @@
-__pycache__/code_editor.cpython-314.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/

@@ -1,0 +1,263 @@
+- Programa
+    - Lista Declaraciones
+        - Declaracion Variable
+            - Tipo : 'int'
+            - Identificadores
+                - ID : 'x'
+                - ID : 'y'
+                - ID : 'z'
+        - Declaracion Variable
+            - Tipo : 'float'
+            - Identificadores
+                - ID : 'a'
+                - ID : 'b'
+                - ID : 'c'
+    - Lista Sentencias
+        - Instruccion / Asignacion
+            - ID : 'suma'
+            - Sentencia Expresion
+                - Componente
+                    - Numero : '45'
+        - Instruccion / Asignacion
+            - ID : 'x'
+            - Sentencia Expresion
+                - Componente
+                    - Numero : '32.32'
+        - Instruccion / Asignacion
+            - ID : 'x'
+            - Sentencia Expresion
+                - Componente
+                    - Numero : '23'
+        - Instruccion / Asignacion
+            - ID : 'y'
+            - Sentencia Expresion
+                - Operador Aritmetico '-' : '-'
+                    - Operador Aritmetico '+' : '+'
+                        - Componente
+                            - Numero : '2'
+                        - Componente
+                            - Numero : '3'
+                    - Componente
+                        - Numero : '1'
+        - Instruccion / Asignacion
+            - ID : 'z'
+            - Sentencia Expresion
+                - Operador Aritmetico '+' : '+'
+                    - Componente
+                        - ID : 'y'
+                    - Componente
+                        - Numero : '7'
+        - Instruccion / Asignacion
+            - ID : 'y'
+            - Sentencia Expresion
+                - Operador Aritmetico '+' : '+'
+                    - Componente
+                        - ID : 'y'
+                    - Componente
+                        - Numero : '1'
+        - Instruccion / Asignacion
+            - ID : 'a'
+            - Sentencia Expresion
+                - Operador Aritmetico '-' : '-'
+                    - Operador Aritmetico '+' : '+'
+                        - Operador Aritmetico '-' : '-'
+                            - Operador Aritmetico '+' : '+'
+                                - Componente
+                                    - Numero : '24.0'
+                                - Componente
+                                    - Numero : '4'
+                            - Operador Aritmetico '*' : '*'
+                                - Operador Aritmetico '/' : '/'
+                                    - Componente
+                                        - Numero : '1'
+                                    - Componente
+                                        - Numero : '3'
+                                - Componente
+                                    - Numero : '2'
+                        - Componente
+                            - Numero : '34'
+                    - Componente
+                        - Numero : '1'
+        - Instruccion / Asignacion
+            - ID : 'x'
+            - Sentencia Expresion
+                - Operador Aritmetico '*' : '*'
+                    - Componente
+                        - Operador Aritmetico '-' : '-'
+                            - Componente
+                                - Numero : '5'
+                            - Componente
+                                - Numero : '3'
+                    - Componente
+                        - Operador Aritmetico '/' : '/'
+                            - Componente
+                                - Numero : '8'
+                            - Componente
+                                - Numero : '2'
+        - Instruccion / Asignacion
+            - ID : 'y'
+            - Sentencia Expresion
+                - Operador Aritmetico '-' : '-'
+                    - Operador Aritmetico '-' : '-'
+                        - Operador Aritmetico '+' : '+'
+                            - Componente
+                                - Numero : '5'
+                            - Componente
+                                - Numero : '3'
+                        - Operador Aritmetico '/' : '/'
+                            - Operador Aritmetico '*' : '*'
+                                - Componente
+                                    - Numero : '2'
+                                - Componente
+                                    - Numero : '4'
+                            - Componente
+                                - Numero : '7'
+                    - Componente
+                        - Numero : '9'
+        - Instruccion / Asignacion
+            - ID : 'z'
+            - Sentencia Expresion
+                - Operador Aritmetico '+' : '+'
+                    - Operador Aritmetico '/' : '/'
+                        - Componente
+                            - Numero : '8'
+                        - Componente
+                            - Numero : '2'
+                    - Operador Aritmetico '*' : '*'
+                        - Componente
+                            - Numero : '15'
+                        - Componente
+                            - Numero : '4'
+        - Instruccion / Asignacion
+            - ID : 'y'
+            - Sentencia Expresion
+                - Componente
+                    - Numero : '14.54'
+        - Seleccion (if)
+            - Operador Relacional : '>'
+                - Componente
+                    - Numero : '2'
+                - Componente
+                    - Numero : '3'
+            - Lista Sentencias
+                - Instruccion / Asignacion
+                    - ID : 'y'
+                    - Sentencia Expresion
+                        - Operador Aritmetico '+' : '+'
+                            - Componente
+                                - ID : 'a'
+                            - Componente
+                                - Numero : '3'
+            - Else
+                - Lista Sentencias
+                    - Seleccion (if)
+                        - Operador AND : '&&'
+                            - Operador Relacional : '>'
+                                - Componente
+                                    - Numero : '4'
+                                - Componente
+                                    - Numero : '2'
+                            - Componente
+                                - Booleano : 'true'
+                        - Lista Sentencias
+                            - Instruccion / Asignacion
+                                - ID : 'b'
+                                - Sentencia Expresion
+                                    - Componente
+                                        - Numero : '3.2'
+                        - Else
+                            - Lista Sentencias
+                                - Instruccion / Asignacion
+                                    - ID : 'b'
+                                    - Sentencia Expresion
+                                        - Componente
+                                            - Numero : '5.0'
+                    - Instruccion / Asignacion
+                        - ID : 'y'
+                        - Sentencia Expresion
+                            - Operador Aritmetico '+' : '+'
+                                - Componente
+                                    - ID : 'y'
+                                - Componente
+                                    - Numero : '1'
+        - Post-Operador '++' : '++'
+            - ID : 'a'
+        - Post-Operador '--' : '--'
+            - ID : 'c'
+        - Instruccion / Asignacion
+            - ID : 'x'
+            - Sentencia Expresion
+                - Operador Aritmetico '+' : '+'
+                    - Componente
+                        - Numero : '3'
+                    - Componente
+                        - Numero : '4'
+        - Repeticion (do)
+            - Lista Sentencias
+                - Instruccion / Asignacion
+                    - ID : 'y'
+                    - Sentencia Expresion
+                        - Operador Aritmetico '+' : '+'
+                            - Operador Aritmetico '*' : '*'
+                                - Componente
+                                    - Operador Aritmetico '+' : '+'
+                                        - Componente
+                                            - ID : 'y'
+                                        - Componente
+                                            - Numero : '1'
+                                - Componente
+                                    - Numero : '2'
+                            - Componente
+                                - Numero : '1'
+                - Iteracion (while)
+                    - Operador Relacional : '>'
+                        - Componente
+                            - ID : 'x'
+                        - Componente
+                            - Numero : '7'
+                    - Lista Sentencias
+                        - Instruccion / Asignacion
+                            - ID : 'x'
+                            - Sentencia Expresion
+                                - Operador Aritmetico '+' : '+'
+                                    - Componente
+                                        - Numero : '6'
+                                    - Operador Aritmetico '/' : '/'
+                                        - Operador Aritmetico '*' : '*'
+                                            - Operador Aritmetico '/' : '/'
+                                                - Componente
+                                                    - Numero : '8'
+                                                - Componente
+                                                    - Numero : '9'
+                                            - Componente
+                                                - Numero : '8'
+                                        - Componente
+                                            - Numero : '3'
+                        - Entrada (cin)
+                            - ID : 'x'
+                        - Instruccion / Asignacion
+                            - ID : 'mas'
+                            - Sentencia Expresion
+                                - Operador Aritmetico '/' : '/'
+                                    - Componente
+                                        - Numero : '36'
+                                    - Componente
+                                        - Numero : '7'
+            - Operador Relacional : '=='
+                - Componente
+                    - ID : 'y'
+                - Componente
+                    - Numero : '5'
+        - Iteracion (while)
+            - Operador Relacional : '=='
+                - Componente
+                    - ID : 'y'
+                - Componente
+                    - Numero : '0'
+            - Lista Sentencias
+                - Entrada (cin)
+                    - ID : 'mas'
+                - Salida (cout)
+                    - Salida
+                        - Componente
+                            - ID : 'x'

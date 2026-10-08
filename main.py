@@ -1,19 +1,25 @@
-from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox, QFrame, QDockWidget, QTextEdit, QToolBar, QStackedWidget, QVBoxLayout, QWidget, QAction, QMenu, QTreeWidget, QTreeWidgetItem, QHeaderView
+from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox, QFrame, QDockWidget, QTextEdit, QToolBar, QStackedWidget, QVBoxLayout, QWidget, QAction, QMenu, QTreeWidget, QTreeWidgetItem, QHeaderView, QTableWidget, QTableWidgetItem
 from PyQt5.uic import loadUi
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QFont, QColor
 import sys
 import os
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 from code_editor import LexicalHighlighter
 from lexico import AnalizadorLexico
 from sintactico import AnalizadorSintactico
+from semantico import AnalizadorSemantico
 
 # clase que hereda las propiedas de qmainwindow
 class Main(QMainWindow):
     def __init__(self):
         super(Main, self).__init__()
-        loadUi("main.ui", self) # carga main.ui en la clase
+        ui_path = os.path.join(BASE_DIR, "main.ui")
+        loadUi(ui_path, self) # carga main.ui en la clase
         
         # =========================
         # VARIABLES
@@ -83,6 +89,7 @@ class Main(QMainWindow):
         # =========================
         self.actionL_xico.triggered.connect(self.ejecutarAnalisisLexico)
         self.actionSint_ctico.triggered.connect(self.ejecutarAnalisisSintactico)
+        self.actionSem_ntico.triggered.connect(self.ejecutarAnalisisSemantico)
 
         # ==========================================
         # TERMINAL
@@ -154,15 +161,48 @@ class Main(QMainWindow):
         self.panelSintactico.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.panelSintactico.header().setStretchLastSection(False)
 
-        self.panelSemantico = QTextEdit()
-        self.panelSemantico.setReadOnly(True)
+        self.panelSemantico = QTreeWidget()
+        self.panelSemantico.setHeaderHidden(True)
         self.panelSemantico.setFrameShape(QFrame.NoFrame)
-        self.panelSemantico.setPlainText("")
+        self.panelSemantico.setStyleSheet("""
+            QTreeWidget {
+                background-color: rgb(46,46,46);
+                color: #dcdcaa;
+                font-family: Consolas, monospace; 
+                font-size: 13px; 
+                border: none;
+            }
+            QTreeWidget::item:hover { background-color: rgb(60,60,60); }
+            QTreeWidget::item:selected { background-color: #062f4a; }
+        """)
+        self.panelSemantico.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.panelSemantico.header().setStretchLastSection(False)
 
-        self.panelTabla = QTextEdit()
-        self.panelTabla.setReadOnly(True)
+        self.panelTabla = QTableWidget()
+        self.panelTabla.setColumnCount(4)
+        self.panelTabla.setHorizontalHeaderLabels(["Lexema", "Tipo", "Offset", "Líneas"])
+        self.panelTabla.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.panelTabla.verticalHeader().setVisible(False)
+        self.panelTabla.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.panelTabla.setSelectionBehavior(QTableWidget.SelectRows)
         self.panelTabla.setFrameShape(QFrame.NoFrame)
-        self.panelTabla.setPlainText("")
+        self.panelTabla.setStyleSheet("""
+            QTableWidget {
+                background-color: rgb(46,46,46);
+                color: #ffffff;
+                font-family: Consolas, monospace;
+                font-size: 12px;
+                border: none;
+                gridline-color: #555555;
+            }
+            QHeaderView::section {
+                background-color: rgb(33,33,33);
+                color: #9cdcfe;
+                font-weight: bold;
+                padding: 4px;
+                border: 1px solid #555555;
+            }
+        """)
 
         self.panelCodigo = QTextEdit()
         self.panelCodigo.setReadOnly(True)
@@ -380,6 +420,130 @@ class Main(QMainWindow):
         # llamada recursiva para dibujar a los hijos
         for hijo in nodo_ast.hijos:
             self.dibujarAST(hijo, item)
+
+    def ejecutarAnalisisSemantico(self):
+        # forzar la visibilidad del panel de análisis semántico
+        self.stackedPanels.setCurrentIndex(3)
+        self.sideBarDock.setWindowTitle("Análisis Semántico (AST Anotado)")
+        if not self.sideBarDock.isVisible():
+            self.sideBarDock.show()
+
+        # limpiar paneles
+        self.panelSemantico.clear()
+        self.panelTabla.setRowCount(0)
+
+        texto = self.textEdit.toPlainText()
+        if not texto.strip():
+            self.terminalPanel.show()
+            self.terminalOutput.setHtml("<span style='color: #ff5555; font-family: Consolas;'>No hay código para analizar.</span>")
+            return
+
+        # 1. Análisis léxico
+        analizador_lex = AnalizadorLexico()
+        tokens, errores_lex = analizador_lex.analizar(texto)
+        if errores_lex:
+            self.terminalPanel.show()
+            html_errores = "<span style='color: #ff5555; font-family: Consolas;'>Errores léxicos impidieron el análisis semántico:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
+            for e in errores_lex:
+                html_errores += f"<li style='color: #ff5555; font-family: Consolas;'>{e}</li>"
+            html_errores += "</ul>"
+            self.terminalOutput.setHtml(html_errores)
+            return
+
+        # 2. Análisis sintáctico
+        tokens_limpios = [t for t in tokens if t.tipo != "COMENTARIO"]
+        analizador_sint = AnalizadorSintactico(tokens_limpios)
+        ast_original, errores_sint = analizador_sint.analizar()
+
+        # Actualizar también el AST original en panelSintactico
+        self.panelSintactico.clear()
+        self.dibujarAST(ast_original, self.panelSintactico)
+        self.panelSintactico.expandAll()
+
+        if errores_sint:
+            self.terminalPanel.show()
+            html_errores = "<span style='color: #ff5555; font-family: Consolas;'>Errores sintácticos impidieron el análisis semántico:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
+            for e in errores_sint:
+                html_errores += f"<li style='color: #ff5555; font-family: Consolas;'>{e}</li>"
+            html_errores += "</ul>"
+            self.terminalOutput.setHtml(html_errores)
+            return
+
+        # 3. Análisis semántico
+        analizador_sem = AnalizadorSemantico()
+        ast_anotado, tabla_simbolos, errores_sem = analizador_sem.analizar(ast_original)
+
+        # Dibujar AST Anotado
+        self.dibujarASTAnotado(ast_anotado, self.panelSemantico)
+        self.panelSemantico.expandAll()
+
+        # Poblar Tabla de Símbolos
+        simbolos = tabla_simbolos.obtener_simbolos()
+        self.panelTabla.setRowCount(len(simbolos))
+        for row, s in enumerate(simbolos):
+            lineas_str = ", ".join(map(str, sorted(s.lineas)))
+            item_nom = QTableWidgetItem(s.nombre)
+            item_tipo = QTableWidgetItem(s.tipo)
+            item_off = QTableWidgetItem(str(s.desplazamiento))
+            item_lin = QTableWidgetItem(lineas_str)
+            item_nom.setTextAlignment(Qt.AlignCenter)
+            item_tipo.setTextAlignment(Qt.AlignCenter)
+            item_off.setTextAlignment(Qt.AlignCenter)
+            self.panelTabla.setItem(row, 0, item_nom)
+            self.panelTabla.setItem(row, 1, item_tipo)
+            self.panelTabla.setItem(row, 2, item_off)
+            self.panelTabla.setItem(row, 3, item_lin)
+
+        # Mostrar Errores en terminal
+        self.terminalPanel.show()
+        c_err = "#ff5555"
+        c_texto = "#ffffff"
+        c_ok = "#50fa7b"
+
+        if errores_sem:
+            html = f"<span style='color: {c_err}; font-weight: bold; font-family: Consolas;'>Errores semánticos encontrados ({len(errores_sem)}):</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
+            for e in errores_sem:
+                html += f"<li style='color: {c_err}; margin-bottom: 5px; font-family: Consolas;'>{e}</li>"
+            html += "</ul>"
+            self.terminalOutput.setHtml(html)
+        else:
+            exito_msg = f"""
+                <span style='color: {c_ok}; font-weight: bold; font-family: Consolas;'>Análisis semántico finalizado con éxito.</span><br>
+                <span style='color: {c_texto}; font-family: Consolas;'>0 errores semánticos encontrados. Tabla de símbolos y AST anotado generados correctamente.</span>
+            """
+            self.terminalOutput.setHtml(exito_msg)
+
+    def dibujarASTAnotado(self, nodo_ast, parent_widget):
+        if not nodo_ast: return
+
+        texto_item = nodo_ast.etiqueta
+        if nodo_ast.lexema:
+            texto_item += f" : '{nodo_ast.lexema}'"
+
+        anotaciones = []
+        if getattr(nodo_ast, 'dtype', None):
+            anotaciones.append(f"tipo: {nodo_ast.dtype}")
+        if getattr(nodo_ast, 'val', None) is not None:
+            anotaciones.append(f"val: {nodo_ast.val}")
+        if getattr(nodo_ast, 'desplazamiento', None) is not None:
+            anotaciones.append(f"offset: {nodo_ast.desplazamiento}")
+        if getattr(nodo_ast, 'coercion', None):
+            anotaciones.append(f"coerción: {nodo_ast.coercion}")
+
+        if anotaciones:
+            texto_item += f"  [{', '.join(anotaciones)}]"
+
+        item = QTreeWidgetItem(parent_widget, [texto_item])
+
+        if getattr(nodo_ast, 'dtype', None) == 'ERROR':
+            item.setForeground(0, QColor("#ff5555"))
+        elif len(nodo_ast.hijos) == 0:
+            item.setForeground(0, QColor("#4ec9b0"))
+        else:
+            item.setForeground(0, QColor("#9cdcfe"))
+
+        for hijo in nodo_ast.hijos:
+            self.dibujarASTAnotado(hijo, item)
 
     # =========================
     # STATUS BAR FUNCTION
@@ -708,6 +872,8 @@ class Main(QMainWindow):
     def limpiarPanelesAnalisis(self):
         self.panelLexico.setPlainText("")
         self.panelSintactico.clear()
+        self.panelSemantico.clear()
+        self.panelTabla.setRowCount(0)
         # limpiar y ocultar terminal
         self.terminalOutput.clear()
         self.terminalPanel.hide()

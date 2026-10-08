@@ -13,7 +13,8 @@ class AnalizadorLexico:
         # Palabras reservadas 
         self.palabras_reservadas = {
             'if', 'else', 'end', 'do', 'while', 'switch', 
-            'case', 'int', 'float', 'main', 'cin', 'cout'
+            'case', 'int', 'float', 'bool', 'main', 'cin', 'cout',
+            'then', 'until', 'true', 'false'
         }
 
     def analizar(self, codigo):
@@ -175,6 +176,11 @@ class AnalizadorLexico:
                     elif c == '=':
                         lexema += c; pos += 1; columna += 1
                         tokens.append(Token("RELACIONAL", lexema, linea_inicio, col_inicio))
+                        estado = "HECHO"
+                    elif (lexema.strip() == '>' and c == '>') or (lexema.strip() == '<' and c == '<'):
+                        lexema = lexema.strip() + c
+                        pos += 1; columna += 1
+                        tokens.append(Token("SIMBOLO", lexema, linea_inicio, col_inicio))
                         estado = "HECHO"
                     else:
                         real_lexema = lexema[0] # Solo toma el primer carácter
