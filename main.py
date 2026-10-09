@@ -345,7 +345,7 @@ class Main(QMainWindow):
         else:
             self.terminalPanel.show()
             exito_msg = f"""
-                <span style='color: {c_texto}; margin-top: 0;'>Análisis léxico finalizado con éxito.</span>
+                <span style='color: {c_texto}; margin-top: 0;'>Análisis léxico finalizado con éxito.</span><br>
                 <span style='color: {c_texto};'>0 errores léxicos encontrados en el código.</span>
             """
             self.terminalOutput.setHtml(exito_msg)
@@ -393,7 +393,7 @@ class Main(QMainWindow):
             self.terminalOutput.setHtml(html_errores)
         else:
             exito_msg = f"""
-                <span style='color: {c_texto}; margin-top: 0;'>Análisis sintáctico finalizado con éxito.</span>
+                <span style='color: {c_texto}; margin-top: 0;'>Análisis sintáctico finalizado con éxito.</span><br>
                 <span style='color: {c_texto};'>0 errores sintácticos encontrados en el código.</span>
             """
             self.terminalOutput.setHtml(exito_msg)
@@ -435,7 +435,7 @@ class Main(QMainWindow):
         texto = self.textEdit.toPlainText()
         if not texto.strip():
             self.terminalPanel.show()
-            self.terminalOutput.setHtml("<span style='color: #ff5555; font-family: Consolas;'>No hay código para analizar.</span>")
+            self.terminalOutput.setHtml("<span style='color: #ff0000;'>No hay código para analizar.</span>")
             return
 
         # 1. Análisis léxico
@@ -443,9 +443,9 @@ class Main(QMainWindow):
         tokens, errores_lex = analizador_lex.analizar(texto)
         if errores_lex:
             self.terminalPanel.show()
-            html_errores = "<span style='color: #ff5555; font-family: Consolas;'>Errores léxicos impidieron el análisis semántico:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
+            html_errores = "<span style='color: #ff0000; margin-top: 0;'>Errores léxicos impidieron el análisis semántico:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
             for e in errores_lex:
-                html_errores += f"<li style='color: #ff5555; font-family: Consolas;'>{e}</li>"
+                html_errores += f"<li style='color: #ff0000; margin-bottom: 5px;'>{e}</li>"
             html_errores += "</ul>"
             self.terminalOutput.setHtml(html_errores)
             return
@@ -462,9 +462,9 @@ class Main(QMainWindow):
 
         if errores_sint:
             self.terminalPanel.show()
-            html_errores = "<span style='color: #ff5555; font-family: Consolas;'>Errores sintácticos impidieron el análisis semántico:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
+            html_errores = "<span style='color: #ff0000; margin-top: 0;'>Errores sintácticos impidieron el análisis semántico:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
             for e in errores_sint:
-                html_errores += f"<li style='color: #ff5555; font-family: Consolas;'>{e}</li>"
+                html_errores += f"<li style='color: #ff0000; margin-bottom: 5px;'>{e}</li>"
             html_errores += "</ul>"
             self.terminalOutput.setHtml(html_errores)
             return
@@ -486,9 +486,11 @@ class Main(QMainWindow):
             item_tipo = QTableWidgetItem(s.tipo)
             item_off = QTableWidgetItem(str(s.desplazamiento))
             item_lin = QTableWidgetItem(lineas_str)
+
             item_nom.setTextAlignment(Qt.AlignCenter)
             item_tipo.setTextAlignment(Qt.AlignCenter)
             item_off.setTextAlignment(Qt.AlignCenter)
+
             self.panelTabla.setItem(row, 0, item_nom)
             self.panelTabla.setItem(row, 1, item_tipo)
             self.panelTabla.setItem(row, 2, item_off)
@@ -496,20 +498,19 @@ class Main(QMainWindow):
 
         # Mostrar Errores en terminal
         self.terminalPanel.show()
-        c_err = "#ff5555"
+        c_err = "#ff0000"
         c_texto = "#ffffff"
-        c_ok = "#50fa7b"
 
         if errores_sem:
-            html = f"<span style='color: {c_err}; font-weight: bold; font-family: Consolas;'>Errores semánticos encontrados ({len(errores_sem)}):</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
+            html = f"<span style='color: {c_err}; margin-top: 0;'>Errores semánticos encontrados:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
             for e in errores_sem:
-                html += f"<li style='color: {c_err}; margin-bottom: 5px; font-family: Consolas;'>{e}</li>"
+                html += f"<li style='color: {c_err}; margin-bottom: 5px;'>{e}</li>"
             html += "</ul>"
             self.terminalOutput.setHtml(html)
         else:
             exito_msg = f"""
-                <span style='color: {c_ok}; font-weight: bold; font-family: Consolas;'>Análisis semántico finalizado con éxito.</span><br>
-                <span style='color: {c_texto}; font-family: Consolas;'>0 errores semánticos encontrados. Tabla de símbolos y AST anotado generados correctamente.</span>
+                <span style='color: {c_texto}; margin-top: 0;'>Análisis semántico finalizado con éxito.</span><br>
+                <span style='color: {c_texto};'>0 errores semánticos encontrados en el código.</span>
             """
             self.terminalOutput.setHtml(exito_msg)
 
