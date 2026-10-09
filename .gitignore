@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 venv/
 ENV/
+
+arbol_sintactico_resultado.txt
