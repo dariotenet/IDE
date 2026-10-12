@@ -1,7 +1,7 @@
-from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox, QFrame, QDockWidget, QTextEdit, QToolBar, QStackedWidget, QVBoxLayout, QWidget, QAction, QMenu, QTreeWidget, QTreeWidgetItem, QHeaderView, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox, QFrame, QDockWidget, QTextEdit, QToolBar, QStackedWidget, QVBoxLayout, QWidget, QAction, QMenu, QTreeWidget, QTreeWidgetItem, QHeaderView, QTableWidget, QTableWidgetItem, QProxyStyle, QStyle
 from PyQt5.uic import loadUi
-from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtCore import Qt, QSize, QPointF
+from PyQt5.QtGui import QFont, QColor, QPainter, QPen, QPolygonF
 import sys
 import os
 
@@ -13,6 +13,41 @@ from code_editor import LexicalHighlighter
 from lexico import AnalizadorLexico
 from sintactico import AnalizadorSintactico
 from semantico import AnalizadorSemantico
+
+
+class TreeBranchStyle(QProxyStyle):
+    """Dibuja las flechas de expansión/colapso del QTreeWidget con alto contraste."""
+    def drawPrimitive(self, element, option, painter, widget=None):
+        if element == QStyle.PE_IndicatorBranch:
+            if option.state & QStyle.State_Children:
+                painter.save()
+                painter.setRenderHint(QPainter.Antialiasing, True)
+                color = QColor("#ffffff") if (option.state & QStyle.State_MouseOver) else QColor("#dcdcaa")
+                pen = QPen(color, 1.8, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+                painter.setPen(pen)
+
+                cx = option.rect.center().x()
+                cy = option.rect.center().y()
+
+                if option.state & QStyle.State_Open:
+                    # Flecha hacia abajo (v)
+                    puntos = QPolygonF([
+                        QPointF(cx - 4.5, cy - 2.0),
+                        QPointF(cx, cy + 2.5),
+                        QPointF(cx + 4.5, cy - 2.0)
+                    ])
+                else:
+                    # Flecha hacia la derecha (>)
+                    puntos = QPolygonF([
+                        QPointF(cx - 2.0, cy - 4.5),
+                        QPointF(cx + 2.5, cy),
+                        QPointF(cx - 2.0, cy + 4.5)
+                    ])
+                painter.drawPolyline(puntos)
+                painter.restore()
+            return
+        super().drawPrimitive(element, option, painter, widget)
+
 
 # clase que hereda las propiedas de qmainwindow
 class Main(QMainWindow):
@@ -124,8 +159,12 @@ class Main(QMainWindow):
         # contenedor apilado
         self.stackedPanels = QStackedWidget()
         
+        # estilo de flechas de alto contraste para los árboles
+        self._tree_branch_style = TreeBranchStyle()
+
         # explorador archivos
         self.panelArchivos = QTreeWidget()
+        self.panelArchivos.setStyle(self._tree_branch_style)
         self.panelArchivos.setHeaderHidden(True) # ocultar la cabecera superior
         self.panelArchivos.setFrameShape(QFrame.NoFrame)
         self.panelArchivos.itemClicked.connect(self.switchToFile) # click cambiar archivo
@@ -144,6 +183,7 @@ class Main(QMainWindow):
         self.panelLexico.setPlainText("")
         
         self.panelSintactico = QTreeWidget()
+        self.panelSintactico.setStyle(self._tree_branch_style)
         self.panelSintactico.setHeaderHidden(True)
         self.panelSintactico.setFrameShape(QFrame.NoFrame)
         self.panelSintactico.setStyleSheet("""
@@ -162,6 +202,7 @@ class Main(QMainWindow):
         self.panelSintactico.header().setStretchLastSection(False)
 
         self.panelSemantico = QTreeWidget()
+        self.panelSemantico.setStyle(self._tree_branch_style)
         self.panelSemantico.setHeaderHidden(True)
         self.panelSemantico.setFrameShape(QFrame.NoFrame)
         self.panelSemantico.setStyleSheet("""

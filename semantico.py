@@ -8,8 +8,7 @@ class Simbolo:
         self.valor = None
 
     def agregar_linea(self, linea):
-        if linea not in self.lineas:
-            self.lineas.append(linea)
+        self.lineas.append(linea)
 
     def __str__(self):
         lineas_str = ", ".join(map(str, sorted(self.lineas)))
@@ -31,6 +30,7 @@ class TablaSimbolos:
     def insertar(self, nombre, tipo, linea, columna=0):
         if nombre in self.simbolos:
             sim_existente = self.simbolos[nombre]
+            sim_existente.agregar_linea(linea)
             error = f"Error Semántico en L:{linea} C:{columna} -> Redeclaración del identificador '{nombre}'. Ya fue declarado previamente en la línea {sim_existente.linea_declaracion}."
             if error not in self.errores:
                 self.errores.append(error)
@@ -224,6 +224,8 @@ class AnalizadorSemantico:
                     self.valores[nombre] = None
                 else:
                     hijo_id.dtype = 'ERROR'
+                    if error and error not in self.errores:
+                        self.errores.append(error)
 
     def procesar_asignacion(self, nodo):
         nodo_id = None
