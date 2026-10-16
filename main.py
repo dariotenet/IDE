@@ -222,11 +222,22 @@ class Main(QMainWindow):
         self.panelTabla = QTableWidget()
         self.panelTabla.setColumnCount(4)
         self.panelTabla.setHorizontalHeaderLabels(["Lexema", "Tipo", "Offset", "Líneas"])
-        self.panelTabla.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.panelTabla.verticalHeader().setVisible(False)
         self.panelTabla.setEditTriggers(QTableWidget.NoEditTriggers)
         self.panelTabla.setSelectionBehavior(QTableWidget.SelectRows)
+        self.panelTabla.setWordWrap(True)
         self.panelTabla.setFrameShape(QFrame.NoFrame)
+
+        header = self.panelTabla.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Interactive)
+        header.setSectionResizeMode(1, QHeaderView.Interactive)
+        header.setSectionResizeMode(2, QHeaderView.Interactive)
+        header.setSectionResizeMode(3, QHeaderView.Stretch)
+        header.setMinimumSectionSize(65)
+        self.panelTabla.setColumnWidth(0, 80)
+        self.panelTabla.setColumnWidth(1, 75)
+        self.panelTabla.setColumnWidth(2, 75)
+
         self.panelTabla.setStyleSheet("""
             QTableWidget {
                 background-color: rgb(46,46,46);
@@ -236,11 +247,14 @@ class Main(QMainWindow):
                 border: none;
                 gridline-color: #555555;
             }
+            QTableWidget::item {
+                padding: 4px 6px;
+            }
             QHeaderView::section {
                 background-color: rgb(33,33,33);
                 color: #9cdcfe;
                 font-weight: bold;
-                padding: 4px;
+                padding: 6px;
                 border: 1px solid #555555;
             }
         """)
@@ -261,6 +275,7 @@ class Main(QMainWindow):
         self.sideBarDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.sideBarDock.setWidget(self.stackedPanels)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.sideBarDock)
+        self.resizeDocks([self.sideBarDock], [460], Qt.Horizontal)
 
         # barra de botones vertical
         self.activityBar = QToolBar("Barra de Actividades")
@@ -531,11 +546,14 @@ class Main(QMainWindow):
             item_nom.setTextAlignment(Qt.AlignCenter)
             item_tipo.setTextAlignment(Qt.AlignCenter)
             item_off.setTextAlignment(Qt.AlignCenter)
+            item_lin.setTextAlignment(Qt.AlignCenter)
 
             self.panelTabla.setItem(row, 0, item_nom)
             self.panelTabla.setItem(row, 1, item_tipo)
             self.panelTabla.setItem(row, 2, item_off)
             self.panelTabla.setItem(row, 3, item_lin)
+
+        self.panelTabla.resizeRowsToContents()
 
         # Mostrar Errores en terminal
         self.terminalPanel.show()
@@ -910,6 +928,12 @@ class Main(QMainWindow):
         # cambiar panel y título al seleccionado
         self.stackedPanels.setCurrentIndex(index)
         self.sideBarDock.setWindowTitle(title)
+
+        # Si se abre la Tabla de Símbolos, asegurar ancho óptimo y reacomodar filas
+        if index == 4:
+            if self.sideBarDock.width() < 450:
+                self.resizeDocks([self.sideBarDock], [460], Qt.Horizontal)
+            self.panelTabla.resizeRowsToContents()
     
     def limpiarPanelesAnalisis(self):
         self.panelLexico.setPlainText("")
