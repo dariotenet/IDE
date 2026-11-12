@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox, QFrame, QDockWidget, QTextEdit, QToolBar, QStackedWidget, QVBoxLayout, QWidget, QAction, QMenu, QTreeWidget, QTreeWidgetItem, QHeaderView, QTableWidget, QTableWidgetItem, QProxyStyle, QStyle
+from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox, QFrame, QDockWidget, QTextEdit, QToolBar, QStackedWidget, QVBoxLayout, QWidget, QAction, QMenu, QTreeWidget, QTreeWidgetItem, QHeaderView, QTableWidget, QTableWidgetItem, QProxyStyle, QStyle, QSplitter, QLabel
 from PyQt5.uic import loadUi
 from PyQt5.QtCore import Qt, QSize, QPointF
 from PyQt5.QtGui import QFont, QColor, QPainter, QPen, QPolygonF
@@ -13,6 +13,7 @@ from code_editor import LexicalHighlighter
 from lexico import AnalizadorLexico
 from sintactico import AnalizadorSintactico
 from semantico import AnalizadorSemantico
+from codigo_intermedio import GeneradorCodigoIntermedio
 
 
 class TreeBranchStyle(QProxyStyle):
@@ -125,6 +126,7 @@ class Main(QMainWindow):
         self.actionL_xico.triggered.connect(self.ejecutarAnalisisLexico)
         self.actionSint_ctico.triggered.connect(self.ejecutarAnalisisSintactico)
         self.actionSem_ntico.triggered.connect(self.ejecutarAnalisisSemantico)
+        self.actionGenerar_c_digo_intermedio.triggered.connect(self.ejecutarCodigoIntermedio)
 
         # ==========================================
         # TERMINAL
@@ -259,17 +261,136 @@ class Main(QMainWindow):
             }
         """)
 
+        # ==========================================
+        # PANEL CÓDIGO INTERMEDIO (TAC + CUÁDRUPLOS)
+        # ==========================================
+        # 1. Encabezado y editor para Código de Tres Direcciones (TAC)
+        self.lblCodigoTAC = QLabel("  CÓDIGO DE TRES DIRECCIONES (TAC)")
+        self.lblCodigoTAC.setStyleSheet("""
+            QLabel {
+                background-color: rgb(33,33,33);
+                color: #4ec9b0;
+                font-family: Consolas, monospace;
+                font-weight: bold;
+                font-size: 11px;
+                padding: 4px 6px;
+                border-bottom: 1px solid #555555;
+            }
+        """)
+
         self.panelCodigo = QTextEdit()
         self.panelCodigo.setReadOnly(True)
         self.panelCodigo.setFrameShape(QFrame.NoFrame)
         self.panelCodigo.setPlainText("")
+        self.panelCodigo.setStyleSheet("""
+            QTextEdit {
+                background-color: rgb(46,46,46);
+                color: #dcdcaa;
+                font-family: Consolas, monospace;
+                font-size: 12px;
+                border: none;
+                padding: 4px 6px;
+            }
+        """)
+
+        widgetTopTAC = QWidget()
+        layoutTopTAC = QVBoxLayout(widgetTopTAC)
+        layoutTopTAC.setContentsMargins(0, 0, 0, 0)
+        layoutTopTAC.setSpacing(0)
+        layoutTopTAC.addWidget(self.lblCodigoTAC)
+        layoutTopTAC.addWidget(self.panelCodigo)
+
+        # 2. Encabezado y QTableWidget para la Tabla de Cuádruplos
+        self.lblTablaCuad = QLabel("  TABLA DE CUÁDRUPLOS")
+        self.lblTablaCuad.setStyleSheet("""
+            QLabel {
+                background-color: rgb(33,33,33);
+                color: #4ec9b0;
+                font-family: Consolas, monospace;
+                font-weight: bold;
+                font-size: 11px;
+                padding: 4px 6px;
+                border-top: 1px solid #555555;
+                border-bottom: 1px solid #555555;
+            }
+        """)
+
+        self.panelTablaCuadruplos = QTableWidget()
+        self.panelTablaCuadruplos.setColumnCount(5)
+        self.panelTablaCuadruplos.setHorizontalHeaderLabels(["#", "OP", "ARG1", "ARG2", "Resultado"])
+        self.panelTablaCuadruplos.verticalHeader().setVisible(False)
+        self.panelTablaCuadruplos.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.panelTablaCuadruplos.setSelectionBehavior(QTableWidget.SelectRows)
+        self.panelTablaCuadruplos.setWordWrap(True)
+        self.panelTablaCuadruplos.setFrameShape(QFrame.NoFrame)
+
+        header_cuad = self.panelTablaCuadruplos.horizontalHeader()
+        header_cuad.setSectionResizeMode(0, QHeaderView.Interactive)
+        header_cuad.setSectionResizeMode(1, QHeaderView.Interactive)
+        header_cuad.setSectionResizeMode(2, QHeaderView.Interactive)
+        header_cuad.setSectionResizeMode(3, QHeaderView.Interactive)
+        header_cuad.setSectionResizeMode(4, QHeaderView.Stretch)
+        header_cuad.setMinimumSectionSize(35)
+        self.panelTablaCuadruplos.setColumnWidth(0, 38)
+        self.panelTablaCuadruplos.setColumnWidth(1, 75)
+        self.panelTablaCuadruplos.setColumnWidth(2, 85)
+        self.panelTablaCuadruplos.setColumnWidth(3, 85)
+
+        self.panelTablaCuadruplos.setStyleSheet("""
+            QTableWidget {
+                background-color: rgb(46,46,46);
+                color: #ffffff;
+                font-family: Consolas, monospace;
+                font-size: 12px;
+                border: none;
+                gridline-color: #555555;
+            }
+            QTableWidget::item {
+                padding: 4px 6px;
+            }
+            QHeaderView::section {
+                background-color: rgb(33,33,33);
+                color: #9cdcfe;
+                font-weight: bold;
+                padding: 6px;
+                border: 1px solid #555555;
+            }
+        """)
+
+        widgetBottomCuad = QWidget()
+        layoutBottomCuad = QVBoxLayout(widgetBottomCuad)
+        layoutBottomCuad.setContentsMargins(0, 0, 0, 0)
+        layoutBottomCuad.setSpacing(0)
+        layoutBottomCuad.addWidget(self.lblTablaCuad)
+        layoutBottomCuad.addWidget(self.panelTablaCuadruplos)
+
+        # 3. Splitter vertical con proporción ajustable
+        self.splitterCodigo = QSplitter(Qt.Vertical)
+        self.splitterCodigo.setHandleWidth(4)
+        self.splitterCodigo.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #333333;
+            }
+            QSplitter::handle:hover {
+                background-color: #007acc;
+            }
+        """)
+        self.splitterCodigo.addWidget(widgetTopTAC)
+        self.splitterCodigo.addWidget(widgetBottomCuad)
+        self.splitterCodigo.setSizes([200, 340])
+
+        self.panelCodigoContainer = QWidget()
+        layoutCodigoContainer = QVBoxLayout(self.panelCodigoContainer)
+        layoutCodigoContainer.setContentsMargins(0, 0, 0, 0)
+        layoutCodigoContainer.setSpacing(0)
+        layoutCodigoContainer.addWidget(self.splitterCodigo)
 
         self.stackedPanels.addWidget(self.panelArchivos)
         self.stackedPanels.addWidget(self.panelLexico)
         self.stackedPanels.addWidget(self.panelSintactico)
         self.stackedPanels.addWidget(self.panelSemantico)
         self.stackedPanels.addWidget(self.panelTabla)
-        self.stackedPanels.addWidget(self.panelCodigo)
+        self.stackedPanels.addWidget(self.panelCodigoContainer)
 
         self.sideBarDock = QDockWidget("Explorer", self)
         self.sideBarDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -498,6 +619,8 @@ class Main(QMainWindow):
         analizador_lex = AnalizadorLexico()
         tokens, errores_lex = analizador_lex.analizar(texto)
         if errores_lex:
+            self.panelCodigo.clear()
+            self.panelTablaCuadruplos.setRowCount(0)
             self.terminalPanel.show()
             html_errores = "<span style='color: #ff0000; margin-top: 0;'>Errores léxicos impidieron el análisis semántico:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
             for e in errores_lex:
@@ -517,6 +640,8 @@ class Main(QMainWindow):
         self.panelSintactico.expandAll()
 
         if errores_sint:
+            self.panelCodigo.clear()
+            self.panelTablaCuadruplos.setRowCount(0)
             self.terminalPanel.show()
             html_errores = "<span style='color: #ff0000; margin-top: 0;'>Errores sintácticos impidieron el análisis semántico:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
             for e in errores_sint:
@@ -561,15 +686,22 @@ class Main(QMainWindow):
         c_texto = "#ffffff"
 
         if errores_sem:
+            self.panelCodigo.clear()
+            self.panelTablaCuadruplos.setRowCount(0)
             html = f"<span style='color: {c_err}; margin-top: 0;'>Errores semánticos encontrados:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
             for e in errores_sem:
                 html += f"<li style='color: {c_err}; margin-bottom: 5px;'>{e}</li>"
             html += "</ul>"
             self.terminalOutput.setHtml(html)
         else:
+            # Generar Código Intermedio justo después de que el análisis semántico finaliza sin errores
+            generador = GeneradorCodigoIntermedio(tabla_simbolos)
+            cuads = generador.generar(ast_anotado)
+            self.renderizarCodigoIntermedio(generador)
+
             exito_msg = f"""
-                <span style='color: {c_texto}; margin-top: 0;'>Análisis semántico finalizado con éxito.</span><br>
-                <span style='color: {c_texto};'>0 errores semánticos encontrados en el código.</span>
+                <span style='color: {c_texto}; margin-top: 0;'>Análisis semántico y generación de código intermedio finalizados con éxito.</span><br>
+                <span style='color: {c_texto};'>0 errores semánticos. {len(cuads)} cuádruplos generados ({generador.temp_count} temporales, {generador.label_count} etiquetas).</span>
             """
             self.terminalOutput.setHtml(exito_msg)
 
@@ -604,6 +736,142 @@ class Main(QMainWindow):
 
         for hijo in nodo_ast.hijos:
             self.dibujarASTAnotado(hijo, item)
+
+    def renderizarCodigoIntermedio(self, generador):
+        # 1. Volcar Código de Tres Direcciones (TAC) en el visor de texto
+        tac = generador.a_tres_direcciones()
+        self.panelCodigo.setPlainText(tac)
+
+        # 2. Poblar la Tabla de Cuádruplos directamente desde la lista de objetos Cuadruplo
+        self.panelTablaCuadruplos.setRowCount(len(generador.cuadruplos))
+        for row, c in enumerate(generador.cuadruplos):
+            item_idx = QTableWidgetItem(str(row))
+            item_op = QTableWidgetItem(str(c.op))
+            item_arg1 = QTableWidgetItem(str(c.arg1))
+            item_arg2 = QTableWidgetItem(str(c.arg2))
+            item_res = QTableWidgetItem(str(c.resultado))
+
+            item_idx.setTextAlignment(Qt.AlignCenter)
+            item_op.setTextAlignment(Qt.AlignCenter)
+            item_arg1.setTextAlignment(Qt.AlignCenter)
+            item_arg2.setTextAlignment(Qt.AlignCenter)
+            item_res.setTextAlignment(Qt.AlignCenter)
+
+            self.panelTablaCuadruplos.setItem(row, 0, item_idx)
+            self.panelTablaCuadruplos.setItem(row, 1, item_op)
+            self.panelTablaCuadruplos.setItem(row, 2, item_arg1)
+            self.panelTablaCuadruplos.setItem(row, 3, item_arg2)
+            self.panelTablaCuadruplos.setItem(row, 4, item_res)
+
+        self.panelTablaCuadruplos.resizeRowsToContents()
+
+    def ejecutarCodigoIntermedio(self):
+        # 1. Forzar la visibilidad del panel de código intermedio
+        self.stackedPanels.setCurrentIndex(5)
+        self.sideBarDock.setWindowTitle("Código Intermedio (TAC / Cuádruplos)")
+        if not self.sideBarDock.isVisible():
+            self.sideBarDock.show()
+
+        if self.sideBarDock.width() < 450:
+            self.resizeDocks([self.sideBarDock], [460], Qt.Horizontal)
+
+        self.panelCodigo.clear()
+        self.panelTablaCuadruplos.setRowCount(0)
+
+        texto = self.textEdit.toPlainText()
+        if not texto.strip():
+            self.terminalPanel.show()
+            self.terminalOutput.setHtml("<span style='color: #ff0000;'>No hay código para compilar.</span>")
+            return
+
+        c_err = "#ff0000"
+        c_texto = "#ffffff"
+
+        # 1. Análisis léxico
+        analizador_lex = AnalizadorLexico()
+        tokens, errores_lex = analizador_lex.analizar(texto)
+        if errores_lex:
+            self.panelCodigo.clear()
+            self.panelTablaCuadruplos.setRowCount(0)
+            self.terminalPanel.show()
+            html_errores = "<span style='color: #ff0000; margin-top: 0;'>Errores léxicos impidieron la generación de código intermedio:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
+            for e in errores_lex:
+                html_errores += f"<li style='color: #ff0000; margin-bottom: 5px;'>{e}</li>"
+            html_errores += "</ul>"
+            self.terminalOutput.setHtml(html_errores)
+            return
+
+        # 2. Análisis sintáctico
+        tokens_limpios = [t for t in tokens if t.tipo != "COMENTARIO"]
+        analizador_sint = AnalizadorSintactico(tokens_limpios)
+        ast_original, errores_sint = analizador_sint.analizar()
+
+        self.panelSintactico.clear()
+        self.dibujarAST(ast_original, self.panelSintactico)
+        self.panelSintactico.expandAll()
+
+        if errores_sint:
+            self.panelCodigo.clear()
+            self.panelTablaCuadruplos.setRowCount(0)
+            self.terminalPanel.show()
+            html_errores = "<span style='color: #ff0000; margin-top: 0;'>Errores sintácticos impidieron la generación de código intermedio:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
+            for e in errores_sint:
+                html_errores += f"<li style='color: #ff0000; margin-bottom: 5px;'>{e}</li>"
+            html_errores += "</ul>"
+            self.terminalOutput.setHtml(html_errores)
+            return
+
+        # 3. Análisis semántico
+        analizador_sem = AnalizadorSemantico()
+        ast_anotado, tabla_simbolos, errores_sem = analizador_sem.analizar(ast_original)
+
+        self.panelSemantico.clear()
+        self.dibujarASTAnotado(ast_anotado, self.panelSemantico)
+        self.panelSemantico.expandAll()
+
+        simbolos = tabla_simbolos.obtener_simbolos()
+        self.panelTabla.setRowCount(len(simbolos))
+        for row, s in enumerate(simbolos):
+            lineas_str = ", ".join(map(str, sorted(s.lineas)))
+            item_nom = QTableWidgetItem(s.nombre)
+            item_tipo = QTableWidgetItem(s.tipo)
+            item_off = QTableWidgetItem(str(s.desplazamiento))
+            item_lin = QTableWidgetItem(lineas_str)
+
+            item_nom.setTextAlignment(Qt.AlignCenter)
+            item_tipo.setTextAlignment(Qt.AlignCenter)
+            item_off.setTextAlignment(Qt.AlignCenter)
+            item_lin.setTextAlignment(Qt.AlignCenter)
+
+            self.panelTabla.setItem(row, 0, item_nom)
+            self.panelTabla.setItem(row, 1, item_tipo)
+            self.panelTabla.setItem(row, 2, item_off)
+            self.panelTabla.setItem(row, 3, item_lin)
+
+        self.panelTabla.resizeRowsToContents()
+
+        if errores_sem:
+            self.panelCodigo.clear()
+            self.panelTablaCuadruplos.setRowCount(0)
+            self.terminalPanel.show()
+            html = f"<span style='color: {c_err}; margin-top: 0;'>Errores semánticos impidieron la generación de código intermedio:</span><ul style='list-style: none; padding-left: 0; margin-top: 5px;'>"
+            for e in errores_sem:
+                html += f"<li style='color: {c_err}; margin-bottom: 5px;'>{e}</li>"
+            html += "</ul>"
+            self.terminalOutput.setHtml(html)
+            return
+
+        # 4. Generación de código intermedio (ejecuta solo si no hay errores previos)
+        generador = GeneradorCodigoIntermedio(tabla_simbolos)
+        cuads = generador.generar(ast_anotado)
+        self.renderizarCodigoIntermedio(generador)
+
+        self.terminalPanel.show()
+        exito_msg = f"""
+            <span style='color: {c_texto}; margin-top: 0;'>Código intermedio generado con éxito.</span><br>
+            <span style='color: {c_texto};'>0 errores. Total: {len(cuads)} cuádruplos generados ({generador.temp_count} temporales, {generador.label_count} etiquetas).</span>
+        """
+        self.terminalOutput.setHtml(exito_msg)
 
     # =========================
     # STATUS BAR FUNCTION
@@ -929,17 +1197,22 @@ class Main(QMainWindow):
         self.stackedPanels.setCurrentIndex(index)
         self.sideBarDock.setWindowTitle(title)
 
-        # Si se abre la Tabla de Símbolos, asegurar ancho óptimo y reacomodar filas
-        if index == 4:
+        # Si se abre la Tabla de Símbolos o Código Intermedio, asegurar ancho óptimo
+        if index in (4, 5):
             if self.sideBarDock.width() < 450:
                 self.resizeDocks([self.sideBarDock], [460], Qt.Horizontal)
-            self.panelTabla.resizeRowsToContents()
+            if index == 4:
+                self.panelTabla.resizeRowsToContents()
+            elif index == 5:
+                self.panelTablaCuadruplos.resizeRowsToContents()
     
     def limpiarPanelesAnalisis(self):
         self.panelLexico.setPlainText("")
         self.panelSintactico.clear()
         self.panelSemantico.clear()
         self.panelTabla.setRowCount(0)
+        self.panelCodigo.clear()
+        self.panelTablaCuadruplos.setRowCount(0)
         # limpiar y ocultar terminal
         self.terminalOutput.clear()
         self.terminalPanel.hide()
