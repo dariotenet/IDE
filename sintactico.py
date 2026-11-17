@@ -295,20 +295,21 @@ class AnalizadorSintactico:
                 
         return nodo
 
-    # repeticion → do { lista_sentencias } while ( expresion ) ;
-    #            | do lista_sentencias until expresion
+    # repeticion -> do { lista_sentencias } while ( expresion ) ;
+    #             | do lista_sentencias until expresion
     def repeticion(self):
         linea = self.token_actual.linea if self.token_actual else 0
         col = self.token_actual.columna if self.token_actual else 0
         nodo = NodoAST("Repeticion (do)", "", linea, col)
         self.coincidir("RESERVADA", "do")
-        
+
         if self.token_actual and self.token_actual.lexema == "{":
             self.avanzar()
             nodo.agregar_hijo(self.lista_sentencias(delimitadores=["}"]))
             self.coincidir("SIMBOLO", "}")
-            
+
             if self.token_actual and self.token_actual.lexema == "until":
+                nodo.lexema = "until"
                 self.avanzar()
                 tiene_par = False
                 if self.token_actual and self.token_actual.lexema == "(":
@@ -320,14 +321,16 @@ class AnalizadorSintactico:
                 if self.token_actual and self.token_actual.lexema == ";":
                     self.avanzar()
             else:
+                nodo.lexema = "while"
                 self.coincidir("RESERVADA", "while")
                 self.coincidir("SIMBOLO", "(")
                 nodo.agregar_hijo(self.expresion())
                 self.coincidir("SIMBOLO", ")")
                 self.coincidir("SIMBOLO", ";")
         else:
-            nodo.agregar_hijo(self.lista_sentencias(delimitadores=["until", "}"]))
+            nodo.agregar_hijo(self.lista_sentencias(delimitadores=["until", "while", "}"]))
             if self.token_actual and self.token_actual.lexema == "until":
+                nodo.lexema = "until"
                 self.avanzar()
                 tiene_par = False
                 if self.token_actual and self.token_actual.lexema == "(":
@@ -339,6 +342,7 @@ class AnalizadorSintactico:
                 if self.token_actual and self.token_actual.lexema == ";":
                     self.avanzar()
             elif self.token_actual and self.token_actual.lexema == "while":
+                nodo.lexema = "while"
                 self.avanzar()
                 tiene_par = False
                 if self.token_actual and self.token_actual.lexema == "(":
@@ -351,7 +355,7 @@ class AnalizadorSintactico:
                     self.avanzar()
             else:
                 self.registrar_error("Se esperaba 'until' o 'while' al final del bloque do")
-                
+
         return nodo
 
     # sent_in → cin >> id ;
