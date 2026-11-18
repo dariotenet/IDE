@@ -5,8 +5,8 @@ from PyQt5.QtWidgets import (
     QProxyStyle, QStyle
 )
 from PyQt5.uic import loadUi
-from PyQt5.QtCore import Qt, QSize, QPointF
-from PyQt5.QtGui import QFont, QColor, QPainter, QPen, QPolygonF
+from PyQt5.QtCore import Qt, QSize, QPointF, QRect
+from PyQt5.QtGui import QFont, QColor, QPainter, QPen, QPolygonF, QPixmap, QIcon
 import sys
 import os
 import subprocess
@@ -58,6 +58,14 @@ class Main(QMainWindow):
         super(Main, self).__init__()
         ui_path = os.path.join(BASE_DIR, "main.ui")
         loadUi(ui_path, self)
+
+        # Quitar Light Theme y el submenú Theme 
+        if hasattr(self, "actionLight_Theme"):
+            self.actionLight_Theme.setVisible(False)
+            for widget in self.actionLight_Theme.associatedWidgets():
+                widget.removeAction(self.actionLight_Theme)
+        if hasattr(self, "menuTheme"):
+            self.menuTheme.menuAction().setVisible(False)
 
         # =========================
         # VARIABLES
@@ -253,6 +261,8 @@ class Main(QMainWindow):
         # Panel de Código Intermedio (.tm y .ci diferenciados)
         self.panelCodigo = QTabWidget()
         self.panelCodigo.setDocumentMode(True)
+        self.panelCodigo.setElideMode(Qt.ElideNone)
+        self.panelCodigo.setUsesScrollButtons(True)
 
         self.panelCodigoTM = QTextEdit()
         self.panelCodigoTM.setReadOnly(True)
@@ -1201,33 +1211,184 @@ class Main(QMainWindow):
     # =========================
     # ICONOS
     # =========================
+    def _crear_icono_vectorial(self, tipo):
+        pixmap = QPixmap(24, 24)
+        pixmap.fill(Qt.transparent)
+        p = QPainter(pixmap)
+        p.setRenderHint(QPainter.Antialiasing, True)
+
+        def lapiz(color_hex, grosor=1.8):
+            pen = QPen(QColor(color_hex), grosor, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+            p.setPen(pen)
+            p.setBrush(Qt.NoBrush)
+
+        if tipo == "new":
+            lapiz("#cccccc")
+            p.drawPolygon(QPolygonF([
+                QPointF(6, 3), QPointF(14, 3), QPointF(18, 7),
+                QPointF(18, 21), QPointF(6, 21)
+            ]))
+            p.drawPolyline(QPolygonF([QPointF(14, 3), QPointF(14, 7), QPointF(18, 7)]))
+
+        elif tipo == "open":
+            lapiz("#dcb67a")
+            p.drawPolygon(QPolygonF([
+                QPointF(3, 6), QPointF(9, 6), QPointF(11, 8),
+                QPointF(21, 8), QPointF(21, 19), QPointF(3, 19)
+            ]))
+
+        elif tipo == "open_folder":
+            lapiz("#dcb67a")
+            p.drawPolyline(QPolygonF([
+                QPointF(13, 19), QPointF(3, 19), QPointF(3, 6),
+                QPointF(9, 6), QPointF(11, 8), QPointF(21, 8), QPointF(21, 13)
+            ]))
+            lapiz("#75beff", 2.0)
+            p.drawLine(17, 14, 17, 20)
+            p.drawLine(14, 17, 20, 17)
+
+        elif tipo == "save":
+            lapiz("#75beff")
+            p.drawRoundedRect(4, 4, 16, 16, 2, 2)
+            p.drawRect(7, 4, 8, 5)
+            p.drawRect(7, 13, 10, 7)
+
+        elif tipo == "save_as":
+            lapiz("#75beff")
+            p.drawPolyline(QPolygonF([
+                QPointF(12, 20), QPointF(4, 20), QPointF(4, 4),
+                QPointF(18, 4), QPointF(20, 6), QPointF(20, 11)
+            ]))
+            p.drawRect(7, 4, 8, 5)
+            lapiz("#dcdcaa", 1.8)
+            p.drawLine(14, 19, 20, 13)
+            p.drawLine(13, 20, 15, 20)
+
+        elif tipo == "close":
+            lapiz("#f48771", 1.8)
+            p.drawRoundedRect(4, 4, 16, 16, 3, 3)
+            p.drawLine(9, 9, 15, 15)
+            p.drawLine(15, 9, 9, 15)
+
+        elif tipo == "exit":
+            lapiz("#cccccc", 1.8)
+            p.drawPolyline(QPolygonF([
+                QPointF(11, 4), QPointF(5, 4), QPointF(5, 20), QPointF(11, 20)
+            ]))
+            lapiz("#f44747", 2.0)
+            p.drawLine(10, 12, 20, 12)
+            p.drawPolyline(QPolygonF([QPointF(16, 8), QPointF(20, 12), QPointF(16, 16)]))
+
+        elif tipo == "undo":
+            lapiz("#75beff", 2.0)
+            p.drawPolyline(QPolygonF([QPointF(9, 5), QPointF(5, 9), QPointF(9, 13)]))
+            p.drawArc(6, 9, 13, 10, 0, 180 * 16)
+
+        elif tipo == "redo":
+            lapiz("#75beff", 2.0)
+            p.drawPolyline(QPolygonF([QPointF(15, 5), QPointF(19, 9), QPointF(15, 13)]))
+            p.drawArc(5, 9, 13, 10, 0, 180 * 16)
+
+        elif tipo == "cut":
+            lapiz("#cccccc", 1.8)
+            p.drawEllipse(5, 15, 5, 5)
+            p.drawEllipse(14, 15, 5, 5)
+            p.drawLine(9, 16, 17, 5)
+            p.drawLine(15, 16, 7, 5)
+
+        elif tipo == "copy":
+            lapiz("#cccccc", 1.7)
+            p.drawPolyline(QPolygonF([
+                QPointF(9, 6), QPointF(9, 3), QPointF(19, 3),
+                QPointF(19, 16), QPointF(16, 16)
+            ]))
+            p.drawRect(5, 7, 11, 14)
+
+        elif tipo == "paste":
+            lapiz("#cccccc", 1.7)
+            p.drawRoundedRect(5, 5, 14, 16, 2, 2)
+            p.drawRect(9, 3, 6, 3)
+            p.drawLine(8, 11, 16, 11)
+            p.drawLine(8, 15, 14, 15)
+
+        elif tipo == "font_inc":
+            p.setPen(QColor("#dcdcaa"))
+            p.setFont(QFont("Consolas", 10, QFont.Bold))
+            p.drawText(QRect(0, 0, 24, 24), Qt.AlignCenter, "A+")
+
+        elif tipo == "font_dec":
+            p.setPen(QColor("#dcdcaa"))
+            p.setFont(QFont("Consolas", 10, QFont.Bold))
+            p.drawText(QRect(0, 0, 24, 24), Qt.AlignCenter, "A-")
+
+        elif tipo == "terminal":
+            lapiz("#cccccc", 1.8)
+            p.drawRoundedRect(3, 4, 18, 16, 2, 2)
+            lapiz("#4ec9b0", 1.8)
+            p.drawPolyline(QPolygonF([QPointF(7, 9), QPointF(10, 12), QPointF(7, 15)]))
+            p.drawLine(12, 15, 17, 15)
+
+        elif tipo == "lexico":
+            lapiz("#c586c0", 2.0)
+            p.drawPolyline(QPolygonF([QPointF(8, 4), QPointF(5, 4), QPointF(5, 20), QPointF(8, 20)]))
+            p.drawPolyline(QPolygonF([QPointF(16, 4), QPointF(19, 4), QPointF(19, 20), QPointF(16, 20)]))
+            p.setBrush(QColor("#c586c0"))
+            p.drawEllipse(10, 10, 4, 4)
+
+        elif tipo == "sintactico":
+            lapiz("#4ec9b0", 1.8)
+            p.drawLine(12, 7, 6, 16)
+            p.drawLine(12, 7, 18, 16)
+            p.setBrush(QColor("#4ec9b0"))
+            p.drawEllipse(9, 3, 6, 6)
+            p.drawEllipse(3, 15, 6, 6)
+            p.drawEllipse(15, 15, 6, 6)
+
+        elif tipo == "semantico":
+            lapiz("#75beff", 1.8)
+            p.drawRoundedRect(4, 4, 16, 16, 3, 3)
+            lapiz("#89d185", 2.2)
+            p.drawPolyline(QPolygonF([QPointF(8, 12), QPointF(11, 15), QPointF(17, 9)]))
+
+        elif tipo == "codigo_int":
+            p.setPen(QColor("#dcdcaa"))
+            p.setFont(QFont("Consolas", 10, QFont.Bold))
+            p.drawText(QRect(0, 0, 24, 24), Qt.AlignCenter, "</>")
+
+        elif tipo == "ejecutar":
+            p.setPen(QPen(QColor("#73c991"), 1.5, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            p.setBrush(QColor("#73c991"))
+            p.drawPolygon(QPolygonF([
+                QPointF(7, 5), QPointF(19, 12), QPointF(7, 19)
+            ]))
+
+        p.end()
+        return QIcon(pixmap)
+
     def setup_icons(self):
-        style = self.style()
-        self.actionNew.setIcon(style.standardIcon(style.SP_FileIcon))
-        self.actionOpen.setIcon(style.standardIcon(style.SP_DirIcon))
-        self.actionOpen_Folder.setIcon(style.standardIcon(style.SP_DirLinkIcon))
-        self.actionSave.setIcon(style.standardIcon(style.SP_DialogSaveButton))
-        self.actionSave_As.setIcon(style.standardIcon(style.SP_DriveFDIcon))
-        self.actionClose.setIcon(style.standardIcon(style.SP_DialogCloseButton))
-        self.actionExit.setIcon(style.standardIcon(style.SP_TitleBarCloseButton))
+        self.actionNew.setIcon(self._crear_icono_vectorial("new"))
+        self.actionOpen.setIcon(self._crear_icono_vectorial("open"))
+        self.actionOpen_Folder.setIcon(self._crear_icono_vectorial("open_folder"))
+        self.actionSave.setIcon(self._crear_icono_vectorial("save"))
+        self.actionSave_As.setIcon(self._crear_icono_vectorial("save_as"))
+        self.actionClose.setIcon(self._crear_icono_vectorial("close"))
+        self.actionExit.setIcon(self._crear_icono_vectorial("exit"))
 
-        self.actionUndo.setIcon(style.standardIcon(style.SP_ArrowBack))
-        self.actionRedo.setIcon(style.standardIcon(style.SP_ArrowForward))
-        self.actionCut.setIcon(style.standardIcon(style.SP_DialogResetButton))
-        self.actionCopy.setIcon(style.standardIcon(style.SP_FileDialogContentsView))
-        self.actionPaste.setIcon(style.standardIcon(style.SP_FileDialogDetailedView))
+        self.actionUndo.setIcon(self._crear_icono_vectorial("undo"))
+        self.actionRedo.setIcon(self._crear_icono_vectorial("redo"))
+        self.actionCut.setIcon(self._crear_icono_vectorial("cut"))
+        self.actionCopy.setIcon(self._crear_icono_vectorial("copy"))
+        self.actionPaste.setIcon(self._crear_icono_vectorial("paste"))
 
-        self.actionDark_Theme.setIcon(style.standardIcon(style.SP_DesktopIcon))
-        self.actionLight_Theme.setIcon(style.standardIcon(style.SP_DesktopIcon))
-        self.actionIncrease_font_size.setIcon(style.standardIcon(style.SP_ArrowUp))
-        self.actionDecrease_Font_Size.setIcon(style.standardIcon(style.SP_ArrowDown))
-        self.actionTerminal.setIcon(style.standardIcon(style.SP_ComputerIcon))
+        self.actionIncrease_font_size.setIcon(self._crear_icono_vectorial("font_inc"))
+        self.actionDecrease_Font_Size.setIcon(self._crear_icono_vectorial("font_dec"))
+        self.actionTerminal.setIcon(self._crear_icono_vectorial("terminal"))
 
-        self.actionL_xico.setIcon(style.standardIcon(style.SP_FileDialogContentsView))
-        self.actionSint_ctico.setIcon(style.standardIcon(style.SP_FileDialogListView))
-        self.actionSem_ntico.setIcon(style.standardIcon(style.SP_FileDialogDetailedView))
-        self.actionGenerar_c_digo_intermedio.setIcon(style.standardIcon(style.SP_FileDialogNewFolder))
-        self.actionEjecutar.setIcon(style.standardIcon(style.SP_MediaPlay))
+        self.actionL_xico.setIcon(self._crear_icono_vectorial("lexico"))
+        self.actionSint_ctico.setIcon(self._crear_icono_vectorial("sintactico"))
+        self.actionSem_ntico.setIcon(self._crear_icono_vectorial("semantico"))
+        self.actionGenerar_c_digo_intermedio.setIcon(self._crear_icono_vectorial("codigo_int"))
+        self.actionEjecutar.setIcon(self._crear_icono_vectorial("ejecutar"))
 
         quickBar = QToolBar("Quick Access", self.menuBar())
         quickBar.setMovable(False)
@@ -1251,7 +1412,6 @@ class Main(QMainWindow):
         quickBar.addAction(self.actionPaste)
         quickBar.addSeparator()
 
-        quickBar.addSeparator()
         quickBar.addAction(self.actionIncrease_font_size)
         quickBar.addAction(self.actionDecrease_Font_Size)
         quickBar.addSeparator()
