@@ -8,3 +8,7 @@ ENV/
 arbol_sintactico_resultado.txt
 programa.ci
 programa.tm
+salida_tm/
+_run_tm_direct.bat
+*.tm
+*.ci

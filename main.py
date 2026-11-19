@@ -2,11 +2,14 @@ from PyQt5.QtWidgets import (
     QMainWindow, QApplication, QFileDialog, QMessageBox, QFrame, QDockWidget,
     QTextEdit, QToolBar, QStackedWidget, QTabWidget, QAction, QMenu,
     QTreeWidget, QTreeWidgetItem, QHeaderView, QTableWidget, QTableWidgetItem,
-    QProxyStyle, QStyle
+    QProxyStyle, QStyle, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
 )
 from PyQt5.uic import loadUi
-from PyQt5.QtCore import Qt, QSize, QPointF, QRect
-from PyQt5.QtGui import QFont, QColor, QPainter, QPen, QPolygonF, QPixmap, QIcon
+from PyQt5.QtCore import Qt, QSize, QPointF, QRect, QRegExp
+from PyQt5.QtGui import (
+    QFont, QColor, QPainter, QPen, QPolygonF, QPixmap, QIcon,
+    QSyntaxHighlighter, QTextCharFormat
+)
 import sys
 import os
 import subprocess
@@ -51,6 +54,129 @@ class TreeBranchStyle(QProxyStyle):
                 painter.restore()
             return
         super().drawPrimitive(element, option, painter, widget)
+
+
+class TMCodeHighlighter(QSyntaxHighlighter):
+    """Resaltador de sintaxis para código objeto Tiny Machine (.tm)."""
+    def __init__(self, document):
+        super().__init__(document)
+        self.rules = []
+
+        # 1. Mnemónicos e instrucciones TM (#ff79c6 - rosa en negrita)
+        fmt_mnem = QTextCharFormat()
+        fmt_mnem.setForeground(QColor("#ff79c6"))
+        fmt_mnem.setFontWeight(QFont.Bold)
+        mnemonicos = [
+            "LD", "ST", "LDC", "LDA", "ADD", "SUB", "MUL", "DIV",
+            "IN", "OUT", "HALT", "JEQ", "JNE", "JLT", "JLE", "JGT", "JGE"
+        ]
+        patron_mnem = r"\b(" + "|".join(mnemonicos) + r")\b"
+        self.rules.append((QRegExp(patron_mnem), fmt_mnem))
+
+        # 2. Números de instrucción al inicio de línea (ej. ' 12:', '0:') (#8be9fd - cian)
+        fmt_lineno = QTextCharFormat()
+        fmt_lineno.setForeground(QColor("#8be9fd"))
+        fmt_lineno.setFontWeight(QFont.DemiBold)
+        self.rules.append((QRegExp(r"^\s*\d+:"), fmt_lineno))
+
+        # 3. Registros y operandos numéricos (#ffb86c / #f1fa8c)
+        fmt_regs = QTextCharFormat()
+        fmt_regs.setForeground(QColor("#ffb86c"))
+        self.rules.append((QRegExp(r"\b\d+,\s*-?\d+\(\d+\)"), fmt_regs))
+        self.rules.append((QRegExp(r"\b\d+,\s*\d+,\s*\d+\b"), fmt_regs))
+
+        fmt_nums = QTextCharFormat()
+        fmt_nums.setForeground(QColor("#f1fa8c"))
+        self.rules.append((QRegExp(r"\b\d+\b"), fmt_nums))
+
+        # 4. Comentarios que inician con '*' o tras la instrucción (#6272a4 - cursiva)
+        self.fmt_comment = QTextCharFormat()
+        self.fmt_comment.setForeground(QColor("#6272a4"))
+        self.fmt_comment.setFontItalic(True)
+        self.rx_full_comment = QRegExp(r"^\s*\*.*$")
+        self.rx_inline_comment = QRegExp(r"\t.*$")
+
+    def highlightBlock(self, text):
+        # Si la línea completa es comentario
+        if self.rx_full_comment.exactMatch(text):
+            self.setFormat(0, len(text), self.fmt_comment)
+            return
+
+        # Aplicar reglas de instrucciones, números y operandos
+        for pattern, fmt in self.rules:
+            expression = QRegExp(pattern)
+            index = expression.indexIn(text)
+            while index >= 0:
+                length = expression.matchedLength()
+                self.setFormat(index, length, fmt)
+                index = expression.indexIn(text, index + length)
+
+        # Resaltar comentarios en línea (después del tabulador o '*')
+        idx_tab = text.find("\t")
+        if idx_tab >= 0:
+            self.setFormat(idx_tab, len(text) - idx_tab, self.fmt_comment)
+        else:
+            idx_star = text.find("*")
+            if idx_star >= 0:
+                self.setFormat(idx_star, len(text) - idx_star, self.fmt_comment)
+
+
+class CICodeHighlighter(QSyntaxHighlighter):
+    """Resaltador de sintaxis para código intermedio de tres direcciones (.ci)."""
+    def __init__(self, document):
+        super().__init__(document)
+        self.rules = []
+
+        # 1. Comentarios (# ...) (#6272a4 - cursiva)
+        self.fmt_comment = QTextCharFormat()
+        self.fmt_comment.setForeground(QColor("#6272a4"))
+        self.fmt_comment.setFontItalic(True)
+        self.rx_comment = QRegExp(r"#.*$")
+
+        # 2. Palabras clave / mnemónicos de 3 direcciones (#ff79c6 - rosa en negrita)
+        fmt_keyword = QTextCharFormat()
+        fmt_keyword.setForeground(QColor("#ff79c6"))
+        fmt_keyword.setFontWeight(QFont.Bold)
+        keywords = ["read", "write", "halt", "goto", "if_false", "if_true", "if"]
+        patron_kw = r"\b(" + "|".join(keywords) + r")\b"
+        self.rules.append((QRegExp(patron_kw), fmt_keyword))
+
+        # 3. Etiquetas (L1:, L2:, L1, L2) (#8be9fd - cian)
+        fmt_label = QTextCharFormat()
+        fmt_label.setForeground(QColor("#8be9fd"))
+        fmt_label.setFontWeight(QFont.Bold)
+        self.rules.append((QRegExp(r"\bL\d+\b:?"), fmt_label))
+
+        # 4. Variables temporales (t1, t2, t3...) (#ffb86c - naranja)
+        fmt_temp = QTextCharFormat()
+        fmt_temp.setForeground(QColor("#ffb86c"))
+        fmt_temp.setFontWeight(QFont.DemiBold)
+        self.rules.append((QRegExp(r"\bt\d+\b"), fmt_temp))
+
+        # 5. Constantes numéricas (#f1fa8c - amarillo suave)
+        fmt_num = QTextCharFormat()
+        fmt_num.setForeground(QColor("#f1fa8c"))
+        self.rules.append((QRegExp(r"\b\d+(\.\d+)?\b"), fmt_num))
+
+        # 6. Operadores aritméticos y relacionales (#50fa7b - verde suave)
+        fmt_op = QTextCharFormat()
+        fmt_op.setForeground(QColor("#50fa7b"))
+        self.rules.append((QRegExp(r"[+\-*/%^=<>!]+"), fmt_op))
+
+    def highlightBlock(self, text):
+        # Aplicar reglas de tokens
+        for pattern, fmt in self.rules:
+            expression = QRegExp(pattern)
+            index = expression.indexIn(text)
+            while index >= 0:
+                length = expression.matchedLength()
+                self.setFormat(index, length, fmt)
+                index = expression.indexIn(text, index + length)
+
+        # Comentarios (# ...) tienen precedencia completa hasta el final de línea
+        idx_comment = self.rx_comment.indexIn(text)
+        if idx_comment >= 0:
+            self.setFormat(idx_comment, len(text) - idx_comment, self.fmt_comment)
 
 
 class Main(QMainWindow):
@@ -277,33 +403,124 @@ class Main(QMainWindow):
             }
         """)
 
-        # 5. Panel de Código Intermedio (.tm y .ci)
+        # 5. Panel de Código Intermedio (.tm y .ci) con Mini Barra de Herramientas
+        self.panelCodigoContenedor = QWidget()
+        layout_codigo = QVBoxLayout(self.panelCodigoContenedor)
+        layout_codigo.setContentsMargins(0, 0, 0, 0)
+        layout_codigo.setSpacing(0)
+
+        # Mini barra de herramientas superior con botones de acción compactos
+        self.barraHerramientasCodigo = QWidget()
+        self.barraHerramientasCodigo.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e1e;
+                border-bottom: 1px solid #333333;
+            }
+            QPushButton {
+                background-color: #2d2d30;
+                color: #d4d4d4;
+                border: 1px solid #3e3e42;
+                border-radius: 4px;
+                padding: 4px 10px;
+                font-family: "Segoe UI", sans-serif;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background-color: #3e3e42;
+                color: #ffffff;
+                border-color: #007acc;
+            }
+            QPushButton:pressed {
+                background-color: #007acc;
+                color: #ffffff;
+            }
+            QPushButton#btnRunTM {
+                background-color: #1b4d3e;
+                color: #50fa7b;
+                border: 1px solid #2e7d5e;
+            }
+            QPushButton#btnRunTM:hover {
+                background-color: #27755b;
+                color: #ffffff;
+                border-color: #50fa7b;
+            }
+            QPushButton#btnRunTM:pressed {
+                background-color: #143d31;
+            }
+        """)
+        layout_tb = QHBoxLayout(self.barraHerramientasCodigo)
+        layout_tb.setContentsMargins(8, 6, 8, 6)
+        layout_tb.setSpacing(6)
+
+        self.btnCopiarCodigo = QPushButton(" Copiar")
+        self.btnCopiarCodigo.setIcon(self._crear_icono_vectorial("copy"))
+        self.btnCopiarCodigo.setToolTip("Copiar contenido de la pestaña activa al portapapeles")
+        self.btnCopiarCodigo.clicked.connect(self.copiarCodigoIntermedioActual)
+
+        self.btnExportarCodigo = QPushButton(" Exportar")
+        self.btnExportarCodigo.setIcon(self._crear_icono_vectorial("exportar"))
+        self.btnExportarCodigo.setToolTip("Exportar archivo de la pestaña activa (.tm o .ci)")
+        self.btnExportarCodigo.clicked.connect(self.exportarCodigoIntermedioActual)
+
+        self.btnCorrerTM = QPushButton(" Correr en TM")
+        self.btnCorrerTM.setObjectName("btnRunTM")
+        self.btnCorrerTM.setIcon(self._crear_icono_vectorial("ejecutar"))
+        self.btnCorrerTM.setToolTip("Ejecutar el simulador TM y correr el programa de inmediato ('g')")
+        self.btnCorrerTM.clicked.connect(self.ejecutarEnTMDirecto)
+
+        layout_tb.addWidget(self.btnCopiarCodigo)
+        layout_tb.addWidget(self.btnExportarCodigo)
+        layout_tb.addWidget(self.btnCorrerTM)
+        layout_tb.addStretch()
+
+        layout_codigo.addWidget(self.barraHerramientasCodigo)
+
         self.panelCodigo = QTabWidget()
         self.panelCodigo.setDocumentMode(False)
         self.panelCodigo.setElideMode(Qt.ElideNone)
         self.panelCodigo.setUsesScrollButtons(True)
 
+        fuente_codigo_intermedio = QFont("Consolas", 11)
+        estilo_editores_codigo = """
+            QTextEdit {
+                background-color: #1e1e1e;
+                color: #f8f8f2;
+                font-family: Consolas, monospace;
+                font-size: 11pt;
+                padding: 10px 12px;
+                border: none;
+                line-height: 1.4;
+            }
+        """
+
         self.panelCodigoTM = QTextEdit()
         self.panelCodigoTM.setReadOnly(True)
         self.panelCodigoTM.setLineWrapMode(QTextEdit.NoWrap)
         self.panelCodigoTM.setFrameShape(QFrame.NoFrame)
-        self.panelCodigoTM.setFont(fuente_paneles)
+        self.panelCodigoTM.setFont(fuente_codigo_intermedio)
+        self.panelCodigoTM.setStyleSheet(estilo_editores_codigo)
+        self.hl_tm = TMCodeHighlighter(self.panelCodigoTM.document())
 
         self.panelCodigoCI = QTextEdit()
         self.panelCodigoCI.setReadOnly(True)
         self.panelCodigoCI.setLineWrapMode(QTextEdit.NoWrap)
         self.panelCodigoCI.setFrameShape(QFrame.NoFrame)
-        self.panelCodigoCI.setFont(fuente_paneles)
+        self.panelCodigoCI.setFont(fuente_codigo_intermedio)
+        self.panelCodigoCI.setStyleSheet(estilo_editores_codigo)
+        self.hl_ci = CICodeHighlighter(self.panelCodigoCI.document())
 
         self.panelCodigo.addTab(self.panelCodigoTM, "Código Objeto TM (.tm)")
         self.panelCodigo.addTab(self.panelCodigoCI, "Código intermedio de tres direcciones (.ci)")
+
+        layout_codigo.addWidget(self.panelCodigo)
 
         self.stackedPanels.addWidget(self.panelArchivos)
         self.stackedPanels.addWidget(self.panelLexico)
         self.stackedPanels.addWidget(self.panelSintactico)
         self.stackedPanels.addWidget(self.panelSemantico)
         self.stackedPanels.addWidget(self.panelTabla)
-        self.stackedPanels.addWidget(self.panelCodigo)
+        self.stackedPanels.addWidget(self.panelCodigoContenedor)
 
         self.sideBarDock = QDockWidget("EXPLORER", self)
         self.sideBarDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -769,6 +986,108 @@ class Main(QMainWindow):
             self.terminalPanel.show()
             self.terminalOutput.append(
                 f"<span style='color: #f44747;'>Error al abrir el simulador TM: {e}</span>"
+            )
+
+    def copiarCodigoIntermedioActual(self):
+        """Copia al portapapeles el contenido de la pestaña activa (.tm o .ci)."""
+        idx = self.panelCodigo.currentIndex()
+        texto = self.panelCodigoTM.toPlainText() if idx == 0 else self.panelCodigoCI.toPlainText()
+        if not texto:
+            self.terminalPanel.show()
+            self.terminalOutput.append("<span style='color: #dcdcaa;'>No hay código para copiar. Genera el código primero.</span>")
+            return
+        QApplication.clipboard().setText(texto)
+        nombre_tipo = "Código Objeto TM (.tm)" if idx == 0 else "Código Intermedio (.ci)"
+        self.statusBar().showMessage(f"¡{nombre_tipo} copiado al portapapeles!", 3500)
+
+    def exportarCodigoIntermedioActual(self):
+        """Permite guardar/exportar el contenido de la pestaña activa (.tm o .ci) en una ruta elegida."""
+        idx = self.panelCodigo.currentIndex()
+        es_tm = (idx == 0)
+        texto = self.panelCodigoTM.toPlainText() if es_tm else self.panelCodigoCI.toPlainText()
+
+        if not texto:
+            self.terminalPanel.show()
+            self.terminalOutput.append("<span style='color: #dcdcaa;'>No hay código para exportar. Genera el código primero.</span>")
+            return
+
+        filtro = "Archivos TM (*.tm);;Todos los archivos (*.*)" if es_tm else "Archivos CI (*.ci);;Todos los archivos (*.*)"
+        nombre_defecto = "programa.tm" if es_tm else "programa.ci"
+        if self.current_path:
+            base, _ = os.path.splitext(os.path.basename(self.current_path))
+            nombre_defecto = f"{base}.tm" if es_tm else f"{base}.ci"
+
+        ruta_guardar, _ = QFileDialog.getSaveFileName(
+            self,
+            "Exportar Código Generado",
+            nombre_defecto,
+            filtro
+        )
+
+        if ruta_guardar:
+            try:
+                encoding = "ascii" if es_tm else "utf-8"
+                with open(ruta_guardar, "w", encoding=encoding, errors="replace") as f:
+                    f.write(texto)
+                self.statusBar().showMessage(f"Archivo exportado con éxito en: {ruta_guardar}", 4000)
+                self.terminalPanel.show()
+                self.terminalOutput.append(f"<span style='color: #89d185;'>Archivo exportado con éxito: {ruta_guardar}</span>")
+            except Exception as e:
+                QMessageBox.critical(self, "Error al Exportar", f"No se pudo guardar el archivo:\n{e}")
+
+    def ejecutarEnTMDirecto(self):
+        """Genera el código si es necesario y corre directamente el comando 'g' en TM."""
+        if not self.generarCodigoIntermedioAction():
+            return
+
+        ruta_tm = self.ultimo_archivo_tm
+        if not ruta_tm or not os.path.isfile(ruta_tm):
+            self.terminalPanel.show()
+            self.terminalOutput.append(
+                "<span style='color: #f44747;'>No se encontró un archivo .tm válido para ejecutar.</span>"
+            )
+            return
+
+        tm_bin, error_tm = self._obtener_ejecutable_tm()
+        if error_tm:
+            self.terminalPanel.show()
+            self.terminalOutput.append(f"<span style='color: #f44747;'>{error_tm}</span>")
+            return
+
+        carpeta_trabajo = os.path.dirname(ruta_tm)
+        nombre_tm = os.path.basename(ruta_tm)
+
+        try:
+            if os.name == "nt":
+                # Crear un script batch temporal que alimenta 'g' a tm.exe y mantiene la consola abierta para inspección
+                ruta_bat = os.path.join(carpeta_trabajo, "_run_tm_direct.bat")
+                with open(ruta_bat, "w", encoding="ascii") as f_bat:
+                    f_bat.write("@echo off\n")
+                    f_bat.write(f'title Simulador TM - Ejecucion Directa de {nombre_tm}\n')
+                    f_bat.write("echo [MaoIDE] Iniciando simulador TM y ejecutando programa (comando 'g')...\n")
+                    f_bat.write("echo ------------------------------------------------------------\n")
+                    f_bat.write(f'echo g | "{tm_bin}" "{nombre_tm}"\n')
+                    f_bat.write("echo ------------------------------------------------------------\n")
+                    f_bat.write("echo [MaoIDE] Fin de la ejecucion. Presione cualquier tecla o ingrese comandos TM:\n")
+                    f_bat.write(f'"{tm_bin}" "{nombre_tm}"\n')
+
+                subprocess.Popen(
+                    ["cmd.exe", "/c", ruta_bat],
+                    cwd=carpeta_trabajo,
+                    creationflags=subprocess.CREATE_NEW_CONSOLE
+                )
+            else:
+                subprocess.Popen([tm_bin, ruta_tm], cwd=carpeta_trabajo)
+
+            self.terminalPanel.show()
+            self.terminalOutput.append("")
+            self.terminalOutput.append(
+                f"<span style='color: #89d185; font-weight: bold;'>Simulador TM ejecutando directamente ('g'): {nombre_tm}</span>"
+            )
+        except Exception as e:
+            self.terminalPanel.show()
+            self.terminalOutput.append(
+                f"<span style='color: #f44747;'>Error al ejecutar simulador TM: {e}</span>"
             )
 
     # =========================
@@ -1474,6 +1793,12 @@ class Main(QMainWindow):
             p.drawPolygon(QPolygonF([
                 QPointF(7, 5), QPointF(19, 12), QPointF(7, 19)
             ]))
+
+        elif tipo == "exportar":
+            lapiz("#8be9fd", 1.8)
+            p.drawRoundedRect(4, 8, 16, 12, 2, 2)
+            p.drawLine(12, 3, 12, 13)
+            p.drawPolyline(QPolygonF([QPointF(8, 7), QPointF(12, 3), QPointF(16, 7)]))
 
         p.end()
         return QIcon(pixmap)
