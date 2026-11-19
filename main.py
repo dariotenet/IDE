@@ -86,6 +86,7 @@ class Main(QMainWindow):
         self.ultimo_archivo_tm = None
         self.ultimo_archivo_ci = None
         self.codigo_fuente_compilado = None
+        self._ultimo_texto_analizado = None
 
         self.ignored_extensions = [
             '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.exe', '.dll',
@@ -101,9 +102,11 @@ class Main(QMainWindow):
         self.textEdit.setFrameShape(QFrame.NoFrame)
         self.highlighter = LexicalHighlighter(self.textEdit.document())
         self.textEdit.updateLineNumberAreaWidth(0)
-        self.setWindowTitle("IDE - Untitled")
+        self.setWindowTitle("MaoIDE - Untitled")
+        self.setWindowIcon(QIcon("red.svg"))
 
         self.textEdit.cursorPositionChanged.connect(self.update_cursor_position)
+        self.textEdit.textChanged.connect(self._al_editar_codigo)
         self.update_cursor_position()
 
         # =========================
@@ -153,7 +156,7 @@ class Main(QMainWindow):
 
         self.terminalPanel.setWidget(self.terminalOutput)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.terminalPanel)
-        self.resizeDocks([self.terminalPanel], [165], Qt.Vertical)
+        self.resizeDocks([self.terminalPanel], [260], Qt.Vertical)
         self.terminalPanel.hide()
 
         # ==========================================
@@ -380,12 +383,27 @@ class Main(QMainWindow):
             self.ultimo_archivo_ci = None
             self.codigo_fuente_compilado = None
 
+    def _al_editar_codigo(self):
+        if (
+            self._ultimo_texto_analizado is not None
+            and self.textEdit.toPlainText() != self._ultimo_texto_analizado
+        ):
+            self.limpiarPanelesAnalisis()
+
+    def _invalidar_codigo_compilado(self):
+        if (
+            self.codigo_fuente_compilado is not None
+            and self.textEdit.toPlainText() != self.codigo_fuente_compilado
+        ):
+            self._limpiar_fases_desde(5)
+
     def ejecutarAnalisisLexico(self, checked=False, *, activar_panel=True):
         self._limpiar_fases_desde(2)
         if activar_panel:
             self._activar_panel(1, "ANÁLISIS LÉXICO")
 
         texto = self.textEdit.toPlainText()
+        self._ultimo_texto_analizado = texto
         analizador = AnalizadorLexico()
         tokens, errores = analizador.analizar(texto)
 
@@ -717,7 +735,7 @@ class Main(QMainWindow):
         ruta_tm = self.ultimo_archivo_tm
         if not ruta_tm or not os.path.isfile(ruta_tm):
             self.terminalPanel.show()
-            self.terminalOutput.setHtml(
+            self.terminalOutput.append(
                 "<span style='color: #f44747;'>No se encontró un archivo .tm válido para ejecutar.</span>"
             )
             return
@@ -725,7 +743,7 @@ class Main(QMainWindow):
         tm_bin, error_tm = self._obtener_ejecutable_tm()
         if error_tm:
             self.terminalPanel.show()
-            self.terminalOutput.setHtml(f"<span style='color: #f44747;'>{error_tm}</span>")
+            self.terminalOutput.append(f"<span style='color: #f44747;'>{error_tm}</span>")
             return
 
         try:
@@ -740,13 +758,16 @@ class Main(QMainWindow):
                 subprocess.Popen([tm_bin, ruta_tm], cwd=carpeta_trabajo)
 
             self.terminalPanel.show()
-            self.terminalOutput.setHtml(f"""
-                <span style='color: #89d185; font-weight: bold;'>Simulador TM iniciado con: {os.path.basename(ruta_tm)}</span><br>
-                <span style='color: #dcdcaa;'>Comandos dentro de la consola TM: <b>g</b> (ejecutar programa), <b>v</b> (ver .ci), <b>r</b> (registros), <b>d 0 10</b> (memoria), <b>q</b> (salir).</span>
-            """)
+            self.terminalOutput.append("")
+            self.terminalOutput.append(
+                f"<span style='color: #89d185; font-weight: bold;'>Simulador TM iniciado con: {os.path.basename(ruta_tm)}</span>"
+            )
+            self.terminalOutput.append(
+                "<span style='color: #dcdcaa;'>Comandos dentro de la consola TM: <b>g</b> (ejecutar programa), <b>v</b> (ver .ci), <b>r</b> (registros), <b>d 0 10</b> (memoria), <b>q</b> (salir).</span>"
+            )
         except Exception as e:
             self.terminalPanel.show()
-            self.terminalOutput.setHtml(
+            self.terminalOutput.append(
                 f"<span style='color: #f44747;'>Error al abrir el simulador TM: {e}</span>"
             )
 
@@ -781,7 +802,7 @@ class Main(QMainWindow):
             self.opened_files_content[self.current_path] = self.textEdit.toPlainText()
 
         self.textEdit.clear()
-        self.setWindowTitle("IDE - Untitled")
+        self.setWindowTitle("MaoIDE - Untitled")
         self.current_path = None
         self.limpiarPanelesAnalisis()
 
@@ -811,7 +832,7 @@ class Main(QMainWindow):
             self.addFileToTree(fileName)
             self.textEdit.setPlainText(fileText)
             self.current_path = fileName
-            self.setWindowTitle("IDE - " + fileName)
+            self.setWindowTitle("MaoIDE - " + fileName)
             self.limpiarPanelesAnalisis()
             self._activar_panel(0, "EXPLORER")
 
@@ -854,14 +875,14 @@ class Main(QMainWindow):
         if archivos_restantes:
             self.switchToFile(archivos_restantes[-1])
         else:
-            self.setWindowTitle("IDE - Untitled")
+            self.setWindowTitle("MaoIDE - Untitled")
             self.limpiarPanelesAnalisis()
 
     def closeEvent(self, event):
         if self.textEdit.toPlainText() != "":
             respuesta = QMessageBox.question(
                 self,
-                "Close IDE",
+                "Close MaoIDE",
                 "Do you want to leave? Your changes will be lost if you don't save them.",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No
@@ -880,7 +901,7 @@ class Main(QMainWindow):
             with open(pathName, 'w', encoding='utf-8') as f:
                 f.write(fileText)
             self.current_path = pathName
-            self.setWindowTitle("IDE - " + pathName)
+            self.setWindowTitle("MaoIDE - " + pathName)
             self.opened_files_content[pathName] = fileText
             self.addFileToTree(pathName)
             self._activar_panel(0, "EXPLORER")
@@ -1088,7 +1109,7 @@ class Main(QMainWindow):
                 background-color: #1e1e1e;
                 color: #d4d4d4;
                 font-family: Consolas, monospace;
-                font-size: 14px;
+                font-size: 16px;
                 padding: 6px;
                 border: none;
             }
@@ -1134,6 +1155,7 @@ class Main(QMainWindow):
         self.ultimo_archivo_tm = None
         self.ultimo_archivo_ci = None
         self.codigo_fuente_compilado = None
+        self._ultimo_texto_analizado = None
         self.terminalOutput.clear()
         self.terminalPanel.hide()
 
@@ -1203,7 +1225,7 @@ class Main(QMainWindow):
 
         self.textEdit.setPlainText(self.opened_files_content.get(clicked_path, ""))
         self.current_path = clicked_path
-        self.setWindowTitle("IDE - " + clicked_path)
+        self.setWindowTitle("MaoIDE - " + clicked_path)
         self.limpiarPanelesAnalisis()
 
     def showFileContextMenu(self, pos):
@@ -1289,7 +1311,7 @@ class Main(QMainWindow):
             if archivos_restantes:
                 self.switchToFile(archivos_restantes[-1])
             else:
-                self.setWindowTitle("IDE - Untitled")
+                self.setWindowTitle("MaoIDE - Untitled")
                 self.limpiarPanelesAnalisis()
 
         return True

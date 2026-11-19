@@ -331,6 +331,21 @@ class AnalizadorSemantico:
                     nodo.val = val_nuevo
                     nodo_id.val = val_nuevo
 
+    def _invalidar_constantes(self):
+        for nombre in self.valores:
+            self.valores[nombre] = None
+            sim = self.tabla_simbolos.buscar(nombre)
+            if sim:
+                sim.valor = None
+
+    def _restaurar_constantes(self, snapshot):
+        self.valores.clear()
+        self.valores.update(snapshot)
+        for nombre, val in snapshot.items():
+            sim = self.tabla_simbolos.buscar(nombre)
+            if sim:
+                sim.valor = val
+
     def procesar_seleccion(self, nodo):
         if not nodo.hijos:
             return
@@ -341,10 +356,19 @@ class AnalizadorSemantico:
         nodo_cond.val = val_cond
 
         if tipo_cond != 'bool' and tipo_cond != 'ERROR':
-            self.registrar_error(f"La condición del 'if' debe ser de tipo 'bool', pero se obtuvo '{tipo_cond}'.", nodo.linea, nodo.columna)
+            self.registrar_error(
+                f"La condición del 'if' debe ser de tipo 'bool', pero se obtuvo '{tipo_cond}'.",
+                nodo.linea, nodo.columna
+            )
 
-        for hijo in nodo.hijos[1:]:
+        antes = dict(self.valores)
+        for i, hijo in enumerate(nodo.hijos[1:]):
+            if i > 0:
+                # Restaurar valores previos al if antes de analizar el bloque else
+                self._restaurar_constantes(antes)
             self.procesar_nodo(hijo)
+
+        self._invalidar_constantes()
 
     def procesar_while(self, nodo):
         if not nodo.hijos:
@@ -356,15 +380,21 @@ class AnalizadorSemantico:
         nodo_cond.val = val_cond
 
         if tipo_cond != 'bool' and tipo_cond != 'ERROR':
-            self.registrar_error(f"La condición del ciclo 'while' debe ser de tipo 'bool', pero se obtuvo '{tipo_cond}'.", nodo.linea, nodo.columna)
+            self.registrar_error(
+                f"La condición del ciclo 'while' debe ser de tipo 'bool', pero se obtuvo '{tipo_cond}'.",
+                nodo.linea, nodo.columna
+            )
 
+        self._invalidar_constantes()
         for hijo in nodo.hijos[1:]:
             self.procesar_nodo(hijo)
+        self._invalidar_constantes()
 
     def procesar_do(self, nodo):
         if not nodo.hijos:
             return
 
+        self._invalidar_constantes()
         nodo_sentencias = nodo.hijos[0]
         self.procesar_nodo(nodo_sentencias)
 
@@ -375,7 +405,12 @@ class AnalizadorSemantico:
             nodo_cond.val = val_cond
 
             if tipo_cond != 'bool' and tipo_cond != 'ERROR':
-                self.registrar_error(f"La condición de término del ciclo 'do' debe ser de tipo 'bool', pero se obtuvo '{tipo_cond}'.", nodo.linea, nodo.columna)
+                self.registrar_error(
+                    f"La condición de término del ciclo 'do' debe ser de tipo 'bool', pero se obtuvo '{tipo_cond}'.",
+                    nodo.linea, nodo.columna
+                )
+
+        self._invalidar_constantes()
 
     def procesar_cin(self, nodo):
         for hijo in nodo.hijos:
@@ -492,7 +527,6 @@ class AnalizadorSemantico:
                         elif op == "*": nodo.val = val_izq * val_der
                         elif op == "/":
                             if val_der == 0:
-                                self.registrar_error("División entre cero detectada en tiempo de compilación.", nodo.linea, nodo.columna)
                                 nodo.val = None
                             else:
                                 if tipo_res == 'int':

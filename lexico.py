@@ -232,29 +232,21 @@ class AnalizadorLexico:
                         estado = "HECHO"
 
                 elif estado == "B_SUMA":
-                    if c.isspace():
-                        if c == '\n': linea += 1; columna = 0
-                        lexema += c; pos += 1; columna += 1
-                    elif c == '+':
+                    if c == '+':
                         lexema += c; pos += 1; columna += 1
                         tokens.append(Token("ARITMETICO", lexema, linea_inicio, col_inicio)) 
                         estado = "HECHO"
                     else:
                         tokens.append(Token("ARITMETICO", lexema[0], linea_inicio, col_inicio)) 
-                        pos = saved_pos; linea = saved_linea; columna = saved_columna
                         estado = "HECHO"
 
                 elif estado == "B_RESTA":
-                    if c.isspace():
-                        if c == '\n': linea += 1; columna = 0
-                        lexema += c; pos += 1; columna += 1
-                    elif c == '-':
+                    if c == '-':
                         lexema += c; pos += 1; columna += 1
                         tokens.append(Token("ARITMETICO", lexema, linea_inicio, col_inicio)) 
                         estado = "HECHO"
                     else:
                         tokens.append(Token("ARITMETICO", lexema[0], linea_inicio, col_inicio)) 
-                        pos = saved_pos; linea = saved_linea; columna = saved_columna
                         estado = "HECHO"
 
                 # ==========================================

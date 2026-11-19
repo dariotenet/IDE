@@ -146,7 +146,19 @@ class GeneradorCodigoIntermedio:
         if etiqueta in ["Numero", "Booleano", "ID"]:
             return nodo.lexema
 
-        if "Pre-Operador" in etiqueta or "Post-Operador" in etiqueta:
+        if "Post-Operador" in etiqueta:
+            nodo_id = next((h for h in nodo.hijos if h.etiqueta == "ID"), None)
+            if nodo_id:
+                op = "+" if "++" in nodo.lexema else "-"
+                viejo = self._nuevo_temporal()
+                nuevo = self._nuevo_temporal()
+                self.lineas.append(f"{viejo} = {nodo_id.lexema}")
+                self.lineas.append(f"{nuevo} = {viejo} {op} 1")
+                self.lineas.append(f"{nodo_id.lexema} = {nuevo}")
+                return viejo
+            return None
+
+        if "Pre-Operador" in etiqueta:
             nodo_id = next((h for h in nodo.hijos if h.etiqueta == "ID"), None)
             if nodo_id:
                 op = "+" if "++" in nodo.lexema else "-"

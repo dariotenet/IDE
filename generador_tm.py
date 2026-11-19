@@ -153,6 +153,12 @@ class GeneradorTM:
             if nodo_id.etiqueta == "ID":
                 loc = self._obtener_offset(nodo_id.lexema)
                 self.emisor.emit_comment(f"decl {nodo_id.lexema} at gp+{loc}")
+                simbolo = self.tabla_simbolos.buscar(nodo_id.lexema) if self.tabla_simbolos else None
+                tipo_var = getattr(nodo_id, "dtype", None) or (simbolo.tipo if simbolo else None)
+                if tipo_var == "float":
+                    self.advertencias.append(
+                        f"Nota TM (L:{nodo_id.linea}): variable '{nodo_id.lexema}' declarada como float; la máquina TM solo opera con enteros."
+                    )
 
     def _gen_stmt(self, nodo):
         if not nodo:
@@ -332,6 +338,9 @@ class GeneradorTM:
                 for item in h.hijos:
                     if item.etiqueta == "CADENA":
                         self.emisor.emit_comment(f"cout string (TM solo imprime enteros): {item.lexema}")
+                        self.advertencias.append(
+                            f"Nota TM (L:{item.linea}): las cadenas ({item.lexema}) no se imprimen en TM (solo enteros)."
+                        )
                     else:
                         self._gen_exp(item)
                         self.emisor.emit_ro("OUT", self.emisor.ac, 0, 0, "write ac")
