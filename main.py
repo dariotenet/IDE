@@ -2,7 +2,8 @@ from PyQt5.QtWidgets import (
     QMainWindow, QApplication, QFileDialog, QMessageBox, QFrame, QDockWidget,
     QTextEdit, QToolBar, QStackedWidget, QTabWidget, QAction, QMenu,
     QTreeWidget, QTreeWidgetItem, QHeaderView, QTableWidget, QTableWidgetItem,
-    QProxyStyle, QStyle, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
+    QProxyStyle, QStyle, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
+    QLineEdit
 )
 from PyQt5.uic import loadUi
 from PyQt5.QtCore import Qt, QSize, QPointF, QRect, QRegExp
@@ -12,7 +13,7 @@ from PyQt5.QtGui import (
 )
 import sys
 import os
-import subprocess
+import html as html_lib
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
@@ -24,6 +25,7 @@ from sintactico import AnalizadorSintactico
 from semantico import AnalizadorSemantico
 from generador_tm import GeneradorTM
 from generador_ci import GeneradorCodigoIntermedio
+from simulador_tm import SimuladorTM
 
 
 class TreeBranchStyle(QProxyStyle):
@@ -67,8 +69,8 @@ class TMCodeHighlighter(QSyntaxHighlighter):
         fmt_mnem.setForeground(QColor("#ff79c6"))
         fmt_mnem.setFontWeight(QFont.Bold)
         mnemonicos = [
-            "LD", "ST", "LDC", "LDA", "ADD", "SUB", "MUL", "DIV",
-            "IN", "OUT", "HALT", "JEQ", "JNE", "JLT", "JLE", "JGT", "JGE"
+            "LD", "ST", "LDC", "LDCF", "LDA", "ADD", "SUB", "MUL", "DIV",
+            "IN", "INF", "OUT", "HALT", "JEQ", "JNE", "JLT", "JLE", "JGT", "JGE"
         ]
         patron_mnem = r"\b(" + "|".join(mnemonicos) + r")\b"
         self.rules.append((QRegExp(patron_mnem), fmt_mnem))
@@ -82,12 +84,12 @@ class TMCodeHighlighter(QSyntaxHighlighter):
         # 3. Registros y operandos numéricos (#ffb86c / #f1fa8c)
         fmt_regs = QTextCharFormat()
         fmt_regs.setForeground(QColor("#ffb86c"))
-        self.rules.append((QRegExp(r"\b\d+,\s*-?\d+\(\d+\)"), fmt_regs))
+        self.rules.append((QRegExp(r"\b\d+,\s*-?\d+(?:\.\d+)?\(\d+\)"), fmt_regs))
         self.rules.append((QRegExp(r"\b\d+,\s*\d+,\s*\d+\b"), fmt_regs))
 
         fmt_nums = QTextCharFormat()
         fmt_nums.setForeground(QColor("#f1fa8c"))
-        self.rules.append((QRegExp(r"\b\d+\b"), fmt_nums))
+        self.rules.append((QRegExp(r"\b\d+(?:\.\d+)?\b"), fmt_nums))
 
         # 4. Comentarios que inician con '*' o tras la instrucción (#6272a4 - cursiva)
         self.fmt_comment = QTextCharFormat()
@@ -213,6 +215,7 @@ class Main(QMainWindow):
         self.ultimo_archivo_ci = None
         self.codigo_fuente_compilado = None
         self._ultimo_texto_analizado = None
+        self.simulador_tm = None
 
         self.ignored_extensions = [
             '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.exe', '.dll',
@@ -271,16 +274,112 @@ class Main(QMainWindow):
         self.actionEjecutar.triggered.connect(self.ejecutarEnTM)
 
         # ==========================================
-        # TERMINAL UNIFICADA
+        # TERMINAL UNIFICADA (CON CONSOLA TM INTEGRADA)
         # ==========================================
         self.terminalPanel = QDockWidget("Terminal", self)
         self.terminalPanel.setAllowedAreas(Qt.BottomDockWidgetArea)
 
+        self.terminalContainer = QWidget()
+        layout_terminal = QVBoxLayout(self.terminalContainer)
+        layout_terminal.setContentsMargins(0, 0, 0, 0)
+        layout_terminal.setSpacing(0)
+
         self.terminalOutput = QTextEdit()
         self.terminalOutput.setReadOnly(True)
         self.terminalOutput.setFrameShape(QFrame.NoFrame)
+        layout_terminal.addWidget(self.terminalOutput)
 
-        self.terminalPanel.setWidget(self.terminalOutput)
+        # Barra interactiva integrada para el simulador TM
+        self.terminalInputBar = QWidget()
+        self.terminalInputBar.setStyleSheet("""
+            QWidget {
+                background-color: #181818;
+                border-top: 1px solid #333333;
+            }
+            QLabel {
+                color: #4ec9b0;
+                font-family: Consolas, monospace;
+                font-size: 13px;
+                font-weight: bold;
+                padding-left: 6px;
+                border: none;
+            }
+            QLineEdit {
+                background-color: #252526;
+                color: #ffffff;
+                border: 1px solid #3e3e42;
+                border-radius: 3px;
+                padding: 4px 8px;
+                font-family: Consolas, monospace;
+                font-size: 13px;
+            }
+            QLineEdit:focus {
+                border-color: #007acc;
+            }
+            QPushButton {
+                background-color: #2d2d30;
+                color: #d4d4d4;
+                border: 1px solid #3e3e42;
+                border-radius: 3px;
+                padding: 4px 10px;
+                font-family: "Segoe UI", sans-serif;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background-color: #3e3e42;
+                color: #ffffff;
+                border-color: #007acc;
+            }
+            QPushButton#btnTmRunG {
+                background-color: #1b4d3e;
+                color: #50fa7b;
+                border-color: #2e7d5e;
+            }
+            QPushButton#btnTmRunG:hover {
+                background-color: #27755b;
+                color: #ffffff;
+            }
+            QPushButton#btnTmStop {
+                background-color: #4d1f24;
+                color: #f48771;
+                border-color: #7d2e36;
+            }
+            QPushButton#btnTmStop:hover {
+                background-color: #752730;
+                color: #ffffff;
+            }
+        """)
+        layout_input = QHBoxLayout(self.terminalInputBar)
+        layout_input.setContentsMargins(6, 5, 6, 5)
+        layout_input.setSpacing(6)
+
+        self.lblTerminalPrompt = QLabel("TM >")
+        self.terminalInput = QLineEdit()
+        self.terminalInput.setPlaceholderText("Escribe comando TM (g, s, r, d 0 10, v, h, q) o valor de entrada...")
+        self.terminalInput.returnPressed.connect(self._enviar_entrada_tm)
+
+        self.btnTmEnviar = QPushButton("Enviar")
+        self.btnTmEnviar.clicked.connect(self._enviar_entrada_tm)
+
+        self.btnTmRunG = QPushButton("g (Ejecutar)")
+        self.btnTmRunG.setObjectName("btnTmRunG")
+        self.btnTmRunG.clicked.connect(lambda: self._procesar_comando_tm("g"))
+
+        self.btnTmStop = QPushButton("Cerrar TM")
+        self.btnTmStop.setObjectName("btnTmStop")
+        self.btnTmStop.clicked.connect(self._detener_sesion_tm)
+
+        layout_input.addWidget(self.lblTerminalPrompt)
+        layout_input.addWidget(self.terminalInput, 1)
+        layout_input.addWidget(self.btnTmEnviar)
+        layout_input.addWidget(self.btnTmRunG)
+        layout_input.addWidget(self.btnTmStop)
+
+        self.terminalInputBar.hide()
+        layout_terminal.addWidget(self.terminalInputBar)
+
+        self.terminalPanel.setWidget(self.terminalContainer)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.terminalPanel)
         self.resizeDocks([self.terminalPanel], [260], Qt.Vertical)
         self.terminalPanel.hide()
@@ -599,6 +698,9 @@ class Main(QMainWindow):
             self.ultimo_archivo_tm = None
             self.ultimo_archivo_ci = None
             self.codigo_fuente_compilado = None
+            self.simulador_tm = None
+            if hasattr(self, "terminalInputBar"):
+                self.terminalInputBar.hide()
 
     def _al_editar_codigo(self):
         if (
@@ -914,36 +1016,85 @@ class Main(QMainWindow):
         self.terminalOutput.setHtml(msg_html)
         return True
 
-    def _obtener_ejecutable_tm(self):
-        es_windows = (os.name == "nt")
-        nombre_bin = "tm.exe" if es_windows else "tm"
-        ruta_bin = os.path.join(BASE_DIR, nombre_bin)
-        ruta_fuente_tm = os.path.join(BASE_DIR, "tm.c")
+    def _imprimir_lineas_tm(self, lineas):
+        """Formatea e imprime líneas del simulador TM dentro de la terminal del IDE."""
+        for linea in lineas:
+            esc = html_lib.escape(linea)
+            if "Resultado del programa (OUT):" in linea:
+                html = f"<span style='color: #50fa7b; font-weight: bold;'>{esc}</span>"
+            elif "Ingrese un numero" in linea or "Illegal value" in linea:
+                html = f"<span style='color: #ffb86c; font-weight: bold;'>{esc}</span>"
+            elif "Error:" in linea or "error" in linea.lower():
+                html = f"<span style='color: #f44747;'>{esc}</span>"
+            elif "HALT" in linea or "finalizada" in linea or "Fin de la simulacion" in linea:
+                html = f"<span style='color: #8be9fd; font-weight: bold;'>{esc}</span>"
+            elif linea.startswith("======="):
+                html = f"<span style='color: #c586c0; font-weight: bold;'>{esc}</span>"
+            else:
+                html = f"<span style='color: #d4d4d4;'>{esc}</span>"
+            self.terminalOutput.append(html)
 
-        if os.path.isfile(ruta_bin):
-            return ruta_bin, None
+        sb = self.terminalOutput.verticalScrollBar()
+        sb.setValue(sb.maximum())
 
-        if not os.path.isfile(ruta_fuente_tm):
-            return None, (
-                f"No se encontró '{nombre_bin}' ni 'tm.c' en '{BASE_DIR}'. "
-                "Copia 'tm.c' de la carpeta Tiny_Intermedio_TM a la carpeta del proyecto."
-            )
+    def _actualizar_prompt_tm(self):
+        if not self.simulador_tm or self.simulador_tm.estado in ("IDLE", "FINISHED"):
+            self.terminalInputBar.hide()
+            return
+        self.terminalInputBar.show()
+        if self.simulador_tm.estado == "WAITING_INPUT":
+            self.lblTerminalPrompt.setText("IN >")
+            self.lblTerminalPrompt.setStyleSheet("color: #ffb86c; font-family: Consolas, monospace; font-size: 13px; font-weight: bold; padding-left: 6px; border: none;")
+            self.btnTmRunG.setEnabled(False)
+            self.terminalInput.setPlaceholderText("Ingresa un número (entero o flotante) y presiona Enter...")
+        else:
+            self.lblTerminalPrompt.setText("TM >")
+            self.lblTerminalPrompt.setStyleSheet("color: #4ec9b0; font-family: Consolas, monospace; font-size: 13px; font-weight: bold; padding-left: 6px; border: none;")
+            self.btnTmRunG.setEnabled(True)
+            self.terminalInput.setPlaceholderText("Comando TM (g, s, r, d 0 10, v, h, q)...")
+        self.terminalInput.setFocus()
 
-        try:
-            proc = subprocess.run(
-                ["gcc", "-std=c11", "-O2", ruta_fuente_tm, "-o", ruta_bin],
-                capture_output=True,
-                text=True,
-                cwd=BASE_DIR
-            )
-            if proc.returncode == 0 and os.path.isfile(ruta_bin):
-                return ruta_bin, None
-            return None, f"Error al compilar tm.c con GCC:\n{proc.stderr}"
-        except FileNotFoundError:
-            return None, (
-                "No se encontró el compilador 'gcc' en el PATH para compilar tm.c. "
-                "Compila tm.c manualmente (gcc tm.c -o tm.exe) o agrégalo al PATH."
-            )
+    def _iniciar_sesion_tm(self, ruta_tm, auto_run=False):
+        sim = SimuladorTM()
+        ok, msgs = sim.cargar_programa(ruta_tm)
+        self.terminalPanel.show()
+        self.terminalOutput.append("")
+        self.terminalOutput.append(
+            f"<span style='color: #3794ff; font-weight: bold;'>=== CONSOLA TM INTEGRADA ({html_lib.escape(os.path.basename(ruta_tm))}) ===</span>"
+        )
+        self._imprimir_lineas_tm(msgs)
+        if not ok:
+            self.simulador_tm = None
+            self.terminalInputBar.hide()
+            return
+
+        self.simulador_tm = sim
+        self._actualizar_prompt_tm()
+        if auto_run:
+            self._procesar_comando_tm("g")
+
+    def _enviar_entrada_tm(self):
+        texto = self.terminalInput.text()
+        self.terminalInput.clear()
+        self._procesar_comando_tm(texto)
+
+    def _procesar_comando_tm(self, texto):
+        if not self.simulador_tm:
+            return
+        prefijo = "IN >" if self.simulador_tm.estado == "WAITING_INPUT" else "TM >"
+        self.terminalOutput.append(
+            f"<span style='color: #858585;'>{prefijo}</span> <span style='color: #ffffff;'>{html_lib.escape(texto)}</span>"
+        )
+        salidas = self.simulador_tm.procesar_entrada(texto)
+        self._imprimir_lineas_tm(salidas)
+        self._actualizar_prompt_tm()
+
+    def _detener_sesion_tm(self):
+        if self.simulador_tm:
+            self.simulador_tm.estado = "FINISHED"
+            self.simulador_tm = None
+        self.terminalInputBar.hide()
+        self.terminalOutput.append("<span style='color: #858585;'>[Sesión TM cerrada]</span>")
 
     def ejecutarEnTM(self):
         if not self.generarCodigoIntermedioAction():
@@ -957,36 +1108,7 @@ class Main(QMainWindow):
             )
             return
 
-        tm_bin, error_tm = self._obtener_ejecutable_tm()
-        if error_tm:
-            self.terminalPanel.show()
-            self.terminalOutput.append(f"<span style='color: #f44747;'>{error_tm}</span>")
-            return
-
-        try:
-            carpeta_trabajo = os.path.dirname(ruta_tm)
-            if os.name == "nt":
-                subprocess.Popen(
-                    [tm_bin, ruta_tm],
-                    cwd=carpeta_trabajo,
-                    creationflags=subprocess.CREATE_NEW_CONSOLE
-                )
-            else:
-                subprocess.Popen([tm_bin, ruta_tm], cwd=carpeta_trabajo)
-
-            self.terminalPanel.show()
-            self.terminalOutput.append("")
-            self.terminalOutput.append(
-                f"<span style='color: #89d185; font-weight: bold;'>Simulador TM iniciado con: {os.path.basename(ruta_tm)}</span>"
-            )
-            self.terminalOutput.append(
-                "<span style='color: #dcdcaa;'>Comandos dentro de la consola TM: <b>g</b> (ejecutar programa), <b>v</b> (ver .ci), <b>r</b> (registros), <b>d 0 10</b> (memoria), <b>q</b> (salir).</span>"
-            )
-        except Exception as e:
-            self.terminalPanel.show()
-            self.terminalOutput.append(
-                f"<span style='color: #f44747;'>Error al abrir el simulador TM: {e}</span>"
-            )
+        self._iniciar_sesion_tm(ruta_tm, auto_run=False)
 
     def copiarCodigoIntermedioActual(self):
         """Copia al portapapeles el contenido de la pestaña activa (.tm o .ci)."""
@@ -1036,7 +1158,7 @@ class Main(QMainWindow):
                 QMessageBox.critical(self, "Error al Exportar", f"No se pudo guardar el archivo:\n{e}")
 
     def ejecutarEnTMDirecto(self):
-        """Genera el código si es necesario y corre directamente el comando 'g' en TM."""
+        """Genera el código si es necesario y corre directamente el comando 'g' en la terminal integrada."""
         if not self.generarCodigoIntermedioAction():
             return
 
@@ -1048,47 +1170,7 @@ class Main(QMainWindow):
             )
             return
 
-        tm_bin, error_tm = self._obtener_ejecutable_tm()
-        if error_tm:
-            self.terminalPanel.show()
-            self.terminalOutput.append(f"<span style='color: #f44747;'>{error_tm}</span>")
-            return
-
-        carpeta_trabajo = os.path.dirname(ruta_tm)
-        nombre_tm = os.path.basename(ruta_tm)
-
-        try:
-            if os.name == "nt":
-                # Crear un script batch temporal que alimenta 'g' a tm.exe y mantiene la consola abierta para inspección
-                ruta_bat = os.path.join(carpeta_trabajo, "_run_tm_direct.bat")
-                with open(ruta_bat, "w", encoding="ascii") as f_bat:
-                    f_bat.write("@echo off\n")
-                    f_bat.write(f'title Simulador TM - Ejecucion Directa de {nombre_tm}\n')
-                    f_bat.write("echo [MaoIDE] Iniciando simulador TM y ejecutando programa (comando 'g')...\n")
-                    f_bat.write("echo ------------------------------------------------------------\n")
-                    f_bat.write(f'echo g | "{tm_bin}" "{nombre_tm}"\n')
-                    f_bat.write("echo ------------------------------------------------------------\n")
-                    f_bat.write("echo [MaoIDE] Fin de la ejecucion. Presione cualquier tecla o ingrese comandos TM:\n")
-                    f_bat.write(f'"{tm_bin}" "{nombre_tm}"\n')
-
-                subprocess.Popen(
-                    ["cmd.exe", "/c", ruta_bat],
-                    cwd=carpeta_trabajo,
-                    creationflags=subprocess.CREATE_NEW_CONSOLE
-                )
-            else:
-                subprocess.Popen([tm_bin, ruta_tm], cwd=carpeta_trabajo)
-
-            self.terminalPanel.show()
-            self.terminalOutput.append("")
-            self.terminalOutput.append(
-                f"<span style='color: #89d185; font-weight: bold;'>Simulador TM ejecutando directamente ('g'): {nombre_tm}</span>"
-            )
-        except Exception as e:
-            self.terminalPanel.show()
-            self.terminalOutput.append(
-                f"<span style='color: #f44747;'>Error al ejecutar simulador TM: {e}</span>"
-            )
+        self._iniciar_sesion_tm(ruta_tm, auto_run=True)
 
     # =========================
     # STATUS BAR FUNCTION
@@ -1475,6 +1557,9 @@ class Main(QMainWindow):
         self.ultimo_archivo_ci = None
         self.codigo_fuente_compilado = None
         self._ultimo_texto_analizado = None
+        self.simulador_tm = None
+        if hasattr(self, "terminalInputBar"):
+            self.terminalInputBar.hide()
         self.terminalOutput.clear()
         self.terminalPanel.hide()
 

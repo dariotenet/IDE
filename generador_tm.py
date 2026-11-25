@@ -153,12 +153,6 @@ class GeneradorTM:
             if nodo_id.etiqueta == "ID":
                 loc = self._obtener_offset(nodo_id.lexema)
                 self.emisor.emit_comment(f"decl {nodo_id.lexema} at gp+{loc}")
-                simbolo = self.tabla_simbolos.buscar(nodo_id.lexema) if self.tabla_simbolos else None
-                tipo_var = getattr(nodo_id, "dtype", None) or (simbolo.tipo if simbolo else None)
-                if tipo_var == "float":
-                    self.advertencias.append(
-                        f"Nota TM (L:{nodo_id.linea}): variable '{nodo_id.lexema}' declarada como float; la máquina TM solo opera con enteros."
-                    )
 
     def _gen_stmt(self, nodo):
         if not nodo:
@@ -329,7 +323,12 @@ class GeneradorTM:
         for h in nodo.hijos:
             if h.etiqueta == "ID":
                 loc = self._obtener_offset(h.lexema)
-                self.emisor.emit_ro("IN", self.emisor.ac, 0, 0, f"read integer into {h.lexema}")
+                simbolo = self.tabla_simbolos.buscar(h.lexema) if self.tabla_simbolos else None
+                tipo_var = getattr(h, "dtype", None) or (simbolo.tipo if simbolo else None)
+                if tipo_var == "float":
+                    self.emisor.emit_ro("INF", self.emisor.ac, 0, 0, f"read float into {h.lexema}")
+                else:
+                    self.emisor.emit_ro("IN", self.emisor.ac, 0, 0, f"read integer into {h.lexema}")
                 self.emisor.emit_rm("ST", self.emisor.ac, loc, self.emisor.gp, f"read: store {h.lexema}")
 
     def _gen_cout(self, nodo):
@@ -359,13 +358,11 @@ class GeneradorTM:
         if etiqueta == "Numero":
             self.emisor.emit_comment("-> Const")
             if "." in nodo.lexema:
-                val_int = int(float(nodo.lexema))
-                self.advertencias.append(
-                    f"Nota TM (L:{nodo.linea}): literal real '{nodo.lexema}' truncado a entero '{val_int}' para simulación TM."
-                )
+                val_float = float(nodo.lexema)
+                self.emisor.emit_rm("LDCF", self.emisor.ac, val_float, 0, f"load float const {val_float}")
             else:
                 val_int = int(nodo.lexema)
-            self.emisor.emit_rm("LDC", self.emisor.ac, val_int, 0, f"load const {val_int}")
+                self.emisor.emit_rm("LDC", self.emisor.ac, val_int, 0, f"load const {val_int}")
             self.emisor.emit_comment("<- Const")
             return
 
